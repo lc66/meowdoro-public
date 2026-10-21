@@ -6,7 +6,7 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
 
 ## Download
 
-**[The latest Meowdoro](https://github.com/lc66/meowdoro-public/releases/latest)**: `Meowdoro-<version>.dmg` under Assets. Older versions and what changed: [Releases](https://github.com/lc66/meowdoro-public/releases).
+**[The latest Meowdoro](https://github.com/lc66/meowdoro-public/releases/latest)**: `Meowdoro-<version>.dmg` under Assets. What changed in each version: [CHANGELOG.md](CHANGELOG.md); older versions: [Releases](https://github.com/lc66/meowdoro-public/releases).
 
 - macOS 14 or later, Apple silicon or Intel. On a Mac without a notch it's a small bar in the middle of the top edge.
 - This test version isn't signed by Apple yet, so macOS refuses the first launch. Drag Meowdoro to Applications, then run this once in Terminal:
@@ -17,6 +17,36 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
 
   The read-me inside the DMG walks through it. Once the app is signed, this step goes away.
 - No Dock or menu bar icon: click the island to open it, right-click it for Settings and Quit.
+
+## What it does
+
+### A focus timer around the notch
+
+- Focus, short break and long break: 25, 5 and 15 minutes, the long break after 4 rounds. All of it is adjustable.
+- A cat sits next to the notch: at its laptop during focus, with a mug on a break. When a phase ends, the island slides out with a bigger cat and what comes next. No Dock icon, no notifications: the island is the notification.
+- The time in the notch as digits, a ring or a bar. It flashes when a minute is left.
+- After a phase ends the time keeps counting up (+3:12) until you start the next one, or the next phase starts on its own.
+- A purr, a beep or nothing when a phase ends, at its own volume.
+- Do Not Disturb during focus, through two Shortcuts (only Shortcuts can switch a Focus on macOS).
+- On the screen with the notch or on the main display; it can hide over full-screen apps.
+
+### Your agents at a glance
+
+Claude Code (in the terminal or Claude Desktop) and Codex (in the terminal or ChatGPT) show up in the island. Settings → Agents on this Mac → Connect installs a small plugin into each.
+
+- Every session with what it's doing: working, waiting for you, finished, failed. A click opens it in Claude Desktop or ChatGPT.
+- A ring shows how full each session's context is. Past a threshold (50% by default), the break card suggests `/compact`.
+- Codex's 5-hour and weekly limits, and when they'd run out at the current pace.
+- Sessions that work in Figma, Canva and other design tools over MCP say so: "→ Figma", and a right-click opens the Figma file.
+- During focus, agent updates can wait until you peek; during breaks they always wait. Meowdoro only listens: it never approves anything and never slows an agent down.
+
+### Statistics
+
+The day, the week or the month: focus time, finished sessions, rest, and the work-to-rest ratio, with a chart by hour or by day. Focus time is split by project: the project of the agent you last prompted or opened from the island.
+
+### Privacy
+
+Settings and statistics stay on your Mac. No account, no analytics. Meowdoro connects to nothing on the internet, except the relay when you turn on agents on other machines, and through it gets only encrypted status.
 
 ## Agents on other machines
 
