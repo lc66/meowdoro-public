@@ -1,0 +1,892 @@
+#!/usr/bin/env python3
+"""Meowdoro remote helper: sends what Claude Code and Codex are doing on this machine to Meowdoro on your Mac.
+
+    agent hook ──▶ `meowdoro-remote hook <agent>` ──unix socket──▶ `meowdoro-remote daemon` ──HTTPS──▶ relay ──▶ Meowdoro
+
+- hook:   called by the agent's hooks. Keeps only status fields (never prompts, tool inputs or outputs, replies),
+          hands them to the daemon and exits at once. Never prints, always exits 0, so it can't disturb the agent.
+- daemon: started by the first hook and gone ten minutes after the last session closes. Reads how full each
+          session's context is (and Codex's plan limits) from the end of its transcript and adds only those
+          numbers to the event. Encrypts each event (AES-256-GCM, key from the setup command; the relay only
+          sees ciphertext), sends it, retries, checks every 15 s that the agents are still running, and sends
+          a heartbeat every minute.
+- setup:  `meowdoro-remote setup <relay-url> <code>` saves the relay, channel and key, then asks Claude Code
+          and Codex to install the Meowdoro plugin (their own commands). `uninstall` removes it again.
+
+Python 3.8+, standard library only. Files: ~/.meowdoro/ (remote.json, remote.sock, remote.lock, remote.log, agent-plugins/).
+"""
+
+import base64
+import calendar
+import fcntl
+import json
+import math
+import os
+import queue
+import re
+import shutil
+import signal
+import socket
+import socketserver
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+
+HOME = os.path.expanduser("~/.meowdoro")
+CONFIG = os.path.join(HOME, "remote.json")
+LOCK = os.path.join(HOME, "remote.lock")
+LOG = os.path.join(HOME, "remote.log")
+PLUGINS = os.path.join(HOME, "agent-plugins")
+VERSION = "0.4.1"
+# What the Mac decodes. Changes to the messages only ever add fields; a change old Meowdoros can't read bumps this,
+# and they then say "needs a newer Meowdoro" for this machine instead of guessing.
+PROTOCOL = 1
+
+LIVENESS_EVERY = 15
+HEARTBEAT_EVERY = 60
+QUIT_AFTER_IDLE = 10 * 60
+# Between replies an agent fires a hook per tool call; one "still working" a minute is enough.
+WORKING_RESEND = 60
+# The transcript is read for its numbers after a reply or a (re)start, and between replies at most this often.
+READ_NOW = {"SessionStart", "Stop"}
+READ_EVERY = 20
+SHELLS = {"sh", "bash", "zsh", "dash", "fish", "ksh", "tcsh", "csh"}
+
+# Same events the Mac plugin listens to.
+HOOKS = {
+    "claude": [("SessionStart", None), ("UserPromptSubmit", None), ("PreToolUse", "AskUserQuestion|ExitPlanMode"),
+               ("PermissionRequest", "*"), ("PermissionDenied", "*"), ("PostToolUse", "*"), ("Stop", None),
+               ("StopFailure", None), ("SessionEnd", None)],
+    "codex": [("SessionStart", None), ("UserPromptSubmit", None), ("PermissionRequest", "*"), ("PostToolUse", "*"),
+              ("Stop", None), ("Interrupt", None), ("SessionEnd", None)],
+}
+WORKING = {"UserPromptSubmit", "PostToolUse", "PermissionDenied", "SubagentStart"}
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# AES-256-GCM (NIST SP 800-38D), pure Python: the standard library has no AES. Events are a few hundred bytes.
+
+def _sbox():
+    box, p, q = [0] * 256, 1, 1
+    while True:
+        p = p ^ ((p << 1) & 0xFF) ^ (0x1B if p & 0x80 else 0)
+        q ^= q << 1
+        q ^= q << 2
+        q ^= q << 4
+        q &= 0xFF
+        if q & 0x80:
+            q ^= 0x09
+        box[p] = q ^ (q << 1 | q >> 7) & 0xFF ^ (q << 2 | q >> 6) & 0xFF ^ (q << 3 | q >> 5) & 0xFF ^ (q << 4 | q >> 4) & 0xFF ^ 0x63
+        if p == 1:
+            break
+    box[0] = 0x63
+    return box
+
+
+SBOX = _sbox()
+
+
+def _xtime(a):
+    return ((a << 1) ^ 0x1B) & 0xFF if a & 0x80 else a << 1
+
+
+def _expand_key(key):
+    assert len(key) == 32
+    words = [list(key[i:i + 4]) for i in range(0, 32, 4)]
+    rcon = 1
+    for i in range(8, 60):
+        temp = list(words[i - 1])
+        if i % 8 == 0:
+            temp = [SBOX[b] for b in temp[1:] + temp[:1]]
+            temp[0] ^= rcon
+            rcon = _xtime(rcon)
+        elif i % 8 == 4:
+            temp = [SBOX[b] for b in temp]
+        words.append([a ^ b for a, b in zip(words[i - 8], temp)])
+    return [sum(words[r * 4:r * 4 + 4], []) for r in range(15)]
+
+
+def _encrypt_block(round_keys, block):
+    s = [b ^ k for b, k in zip(block, round_keys[0])]
+    for r in range(1, 15):
+        s = [SBOX[b] for b in s]
+        s = [s[(i + 4 * (i % 4)) % 16] for i in range(16)]  # ShiftRows (column-major state)
+        if r != 14:
+            mixed = []
+            for c in range(4):
+                a = s[4 * c:4 * c + 4]
+                t = a[0] ^ a[1] ^ a[2] ^ a[3]
+                mixed += [a[i] ^ t ^ _xtime(a[i] ^ a[(i + 1) % 4]) for i in range(4)]
+            s = mixed
+        s = [b ^ k for b, k in zip(s, round_keys[r])]
+    return bytes(s)
+
+
+def _gf_mul(x, y):
+    z, v = 0, y
+    for i in range(127, -1, -1):
+        if (x >> i) & 1:
+            z ^= v
+        v = (v >> 1) ^ (0xE1 << 120) if v & 1 else v >> 1
+    return z
+
+
+def _ghash(h, aad, ciphertext):
+    def blocks(data):
+        for i in range(0, len(data), 16):
+            yield data[i:i + 16].ljust(16, b"\0")
+    y = 0
+    for block in list(blocks(aad)) + list(blocks(ciphertext)):
+        y = _gf_mul(y ^ int.from_bytes(block, "big"), h)
+    lengths = (len(aad) * 8).to_bytes(8, "big") + (len(ciphertext) * 8).to_bytes(8, "big")
+    return _gf_mul(y ^ int.from_bytes(lengths, "big"), h)
+
+
+def _ctr(round_keys, counter, data):
+    out = bytearray()
+    for i in range(0, len(data), 16):
+        counter = counter[:12] + ((int.from_bytes(counter[12:], "big") + 1) & 0xFFFFFFFF).to_bytes(4, "big")
+        stream = _encrypt_block(round_keys, counter)
+        out += bytes(a ^ b for a, b in zip(data[i:i + 16], stream))
+    return bytes(out)
+
+
+def seal(key, nonce, plaintext, aad=b""):
+    """AES-256-GCM with a 96-bit nonce: returns ciphertext + 16-byte tag."""
+    round_keys = _expand_key(key)
+    h = int.from_bytes(_encrypt_block(round_keys, bytes(16)), "big")
+    j0 = nonce + b"\0\0\0\1"
+    ciphertext = _ctr(round_keys, j0, plaintext)
+    tag = (_ghash(h, aad, ciphertext) ^ int.from_bytes(_encrypt_block(round_keys, j0), "big")).to_bytes(16, "big")
+    return ciphertext + tag
+
+
+def open_sealed(key, nonce, sealed, aad=b""):
+    round_keys = _expand_key(key)
+    h = int.from_bytes(_encrypt_block(round_keys, bytes(16)), "big")
+    j0 = nonce + b"\0\0\0\1"
+    ciphertext, tag = sealed[:-16], sealed[-16:]
+    expected = (_ghash(h, aad, ciphertext) ^ int.from_bytes(_encrypt_block(round_keys, j0), "big")).to_bytes(16, "big")
+    if not _constant_time_equal(tag, expected):
+        raise ValueError("bad tag")
+    return _ctr(round_keys, j0, ciphertext)
+
+
+def _constant_time_equal(a, b):
+    return len(a) == len(b) and sum(x ^ y for x, y in zip(a, b)) == 0
+
+
+def b64u(data):
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def unb64u(text):
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# What leaves the machine
+
+def project_name(cwd):
+    """The git repository the agent works in (the main one for a worktree), else the folder."""
+    if not cwd:
+        return "—"
+    path = os.path.abspath(cwd)
+    probe = path
+    while True:
+        git = os.path.join(probe, ".git")
+        if os.path.isdir(git):
+            return os.path.basename(probe) or probe
+        if os.path.isfile(git):
+            # A worktree: "gitdir: /main/repo/.git/worktrees/<name>".
+            try:
+                with open(git) as f:
+                    target = f.read().strip().split("gitdir:", 1)[-1].strip()
+                marker = os.sep + ".git" + os.sep
+                if marker in target:
+                    return os.path.basename(target.split(marker)[0])
+            except OSError:
+                pass
+            return os.path.basename(probe)
+        parent = os.path.dirname(probe)
+        if parent == probe:
+            return os.path.basename(path) or path
+        probe = parent
+
+
+def compact(agent, payload):
+    """Only what the island shows. Never prompts, tool inputs or outputs, or the last reply."""
+    name = payload.get("hook_event_name")
+    session = payload.get("session_id")
+    if not name or not session:
+        return None
+    event = {"agent": agent, "hook_event_name": name, "session_id": session, "project": project_name(payload.get("cwd"))}
+    title = payload.get("session_title")
+    if isinstance(title, str) and title.strip():
+        event["session_title"] = title.strip()[:200]
+    tool = payload.get("tool_name")
+    if isinstance(tool, str):
+        # The tool's name says "wants to use Bash" / "has a question"; MCP names say which design app.
+        if name in ("PermissionRequest", "PreToolUse") or tool.startswith("mcp__"):
+            event["tool_name"] = tool[:120]
+    if isinstance(payload.get("mcp_server"), str):
+        event["mcp_server"] = payload["mcp_server"][:120]
+    file_key = (payload.get("tool_input") or {}).get("fileKey") if isinstance(payload.get("tool_input"), dict) else None
+    if isinstance(file_key, str) and len(file_key) < 64:
+        event["tool_input"] = {"fileKey": file_key}
+    if name == "StopFailure" and isinstance(payload.get("error"), str):
+        event["error"] = payload["error"][:80]
+    return event
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Context and plan limits: numbers from the end of the agent's transcript (the same reading as ContextReader on
+# the Mac). Only the numbers leave the machine, never the transcript's path or anything in it.
+
+CLAUDE_DEFAULT_WINDOW = 200_000
+CLAUDE_LONG_WINDOW = 1_000_000
+# Codex leaves this much (instructions, tools) out of its "context left" figure.
+CODEX_BASELINE = 12_000
+
+
+def _int(value):
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _number(value):
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _rounded(value):
+    """Halves away from zero, like Swift's rounded() (Python's round() goes to even)."""
+    return int(math.floor(value + 0.5))
+
+
+def _json(line):
+    try:
+        value = json.loads(line)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def last_line(path, match, limit=16 << 20):
+    """Hands the file's lines to `match`, last line first, and returns the first hit. Transcripts grow to tens of MB,
+    so it reads only the end, widening the window up to `limit` bytes when the last lines don't have the answer."""
+    if not isinstance(path, str) or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "rb") as f:
+            end = f.seek(0, os.SEEK_END)
+            span, read, carry = 256 << 10, 0, b""
+            while end > 0 and read < limit:
+                start = max(0, end - min(span, limit - read))
+                f.seek(start)
+                chunk = f.read(end - start) + carry
+                read += end - start
+                lines = chunk.split(b"\n")
+                # The start of the line cut by this chunk's edge.
+                carry = lines.pop(0) if start > 0 else b""
+                for line in reversed(lines):
+                    hit = match(line) if line else None
+                    if hit is not None:
+                        return hit
+                end = start
+                span *= 4
+    except OSError:
+        pass
+    return None
+
+
+def _claude_entry(line):
+    """A reply's context size and model, or the size right after a compaction (no model there)."""
+    if b'"usage"' not in line and b"compact_boundary" not in line:
+        return None
+    entry = _json(line)
+    if entry is None:
+        return None
+    if entry.get("type") == "system" and entry.get("subtype") == "compact_boundary":
+        metadata = entry.get("compactMetadata")
+        tokens = _int(metadata.get("postTokens")) if isinstance(metadata, dict) else None
+        return (tokens, None) if tokens is not None else None
+    # Subagents' replies have their own, separate context.
+    message = entry.get("message")
+    if entry.get("type") != "assistant" or entry.get("isSidechain") is True or not isinstance(message, dict):
+        return None
+    usage = message.get("usage")
+    model = message.get("model") if isinstance(message.get("model"), str) else None
+    if not isinstance(usage, dict) or model == "<synthetic>":
+        return None
+    tokens = sum(_int(usage.get(key)) or 0 for key in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+    # Errors and synthetic messages report zero.
+    return (tokens, model) if tokens > 0 else None
+
+
+def claude_catalog_dir():
+    return os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"), "cache", "model-catalog")
+
+
+def _modified(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return 0
+
+
+def claude_windows(directory):
+    """Model id → window, from the newest catalog Claude downloaded that lists them (`max_input_tokens`)."""
+    try:
+        files = [os.path.join(directory, name) for name in os.listdir(directory) if name.endswith(".json")]
+    except OSError:
+        return {}
+    for path in sorted(files, key=_modified, reverse=True):
+        try:
+            with open(path, "rb") as f:
+                catalog = _json(f.read(4 << 20))
+            models = catalog["catalog"]["config"]["models"]
+        except (OSError, TypeError, KeyError):
+            continue
+        windows = {}
+        for model in models if isinstance(models, list) else []:
+            runtime = model.get("runtime") if isinstance(model, dict) else None
+            tokens = _int(runtime.get("max_input_tokens")) if isinstance(runtime, dict) else None
+            if tokens and tokens > 0 and isinstance(model.get("id"), str):
+                windows[model["id"]] = tokens
+        if windows:
+            return windows
+    return {}
+
+
+def claude_window(model, catalog, previous, tokens):
+    window = None
+    if model:
+        if "[1m]" in model.lower():
+            window = CLAUDE_LONG_WINDOW
+        else:
+            # Ids may carry a date suffix on one side only: the longest matching entry wins.
+            window = catalog.get(model)
+            if window is None:
+                matches = [(len(key), value) for key, value in catalog.items() if model.startswith(key) or key.startswith(model)]
+                window = max(matches)[1] if matches else None
+    resolved = window or previous or CLAUDE_DEFAULT_WINDOW
+    # A session already past 200K can only be on the long window.
+    return CLAUDE_LONG_WINDOW if tokens > resolved else resolved
+
+
+def _context(tokens, window, percent):
+    return {"tokens": tokens, "window": window, "percent": min(100, max(0, percent))}
+
+
+def _codex_entry(line):
+    if b"token_count" not in line:
+        return None
+    entry = _json(line)
+    payload = entry.get("payload") if entry and entry.get("type") == "event_msg" else None
+    if not isinstance(payload, dict) or payload.get("type") != "token_count":
+        return None
+    # Events with only rate limits have no `info`.
+    info = payload.get("info")
+    last = info.get("last_token_usage") if isinstance(info, dict) else None
+    tokens = _int(last.get("total_tokens")) if isinstance(last, dict) else None
+    window = _int(info.get("model_context_window")) if isinstance(info, dict) else None
+    if tokens is None or not window or window <= 0:
+        return None
+    return _context(tokens, window, codex_percent(tokens, window))
+
+
+def codex_percent(tokens, window):
+    """100 minus Codex's own "% context left": the baseline is left out of both the tokens and the window."""
+    if window <= CODEX_BASELINE:
+        return 100
+    effective = window - CODEX_BASELINE
+    used = max(0, tokens - CODEX_BASELINE)
+    left = _rounded(max(0, effective - used) / effective * 100)
+    return 100 - min(100, left)
+
+
+def _timestamp(text):
+    """Codex's "2026-10-21T04:24:47.729Z" as epoch seconds (fromisoformat can't read it before Python 3.11)."""
+    found = re.match(r"(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(\.\d+)?(Z|[+-]\d\d:?\d\d)?$", text or "")
+    if not found:
+        return None
+    year, month, day, hour, minute, second = (int(part) for part in found.groups()[:6])
+    seconds = calendar.timegm((year, month, day, hour, minute, second)) + float(found.group(7) or 0)
+    zone = found.group(8)
+    if zone and zone != "Z":
+        offset = int(zone[1:3]) * 3600 + int(zone[-2:]) * 60
+        seconds -= offset if zone[0] == "+" else -offset
+    return seconds
+
+
+def _codex_limits_entry(line):
+    """Codex writes its plan limits with each `token_count` event (`rate_limits.primary` / `.secondary`)."""
+    if b"rate_limits" not in line:
+        return None
+    entry = _json(line)
+    payload = entry.get("payload") if entry and entry.get("type") == "event_msg" else None
+    if not isinstance(payload, dict) or payload.get("type") != "token_count" or not isinstance(payload.get("rate_limits"), dict):
+        return None
+    windows = []
+    for key in ("primary", "secondary"):
+        window = payload["rate_limits"].get(key)
+        if not isinstance(window, dict):
+            continue
+        minutes, percent, resets = _int(window.get("window_minutes")), _number(window.get("used_percent")), _number(window.get("resets_at"))
+        if minutes is None or percent is None:
+            continue
+        windows.append(dict({"minutes": minutes, "percent": percent}, **({"resets_at": resets} if resets is not None else {})))
+    if not windows:
+        return None
+    at = _timestamp(entry.get("timestamp")) if isinstance(entry.get("timestamp"), str) else None
+    return {"at": at if at is not None else time.time(), "windows": sorted(windows, key=lambda w: w["minutes"])}
+
+
+def read_context(agent, transcript, previous_window=None, catalog_dir=None):
+    """`{"tokens", "window", "percent"}` after the agent's last reply, or None."""
+    if agent == "codex":
+        return last_line(transcript, _codex_entry)
+    found = last_line(transcript, _claude_entry)
+    if found is None:
+        return None
+    tokens, model = found
+    window = claude_window(model, claude_windows(catalog_dir or claude_catalog_dir()), previous_window, tokens)
+    return _context(tokens, window, _rounded(tokens / window * 100))
+
+
+def read_limits(agent, transcript):
+    """`{"at", "windows": [{"minutes", "percent", "resets_at"}]}`: Codex's plan limits. Claude Code keeps no copy of its own."""
+    return last_line(transcript, _codex_limits_entry) if agent == "codex" else None
+
+
+def agent_pid():
+    """The agent that ran this hook: the first ancestor that isn't a shell."""
+    pid = os.getppid()
+    for _ in range(6):
+        name, parent = _process(pid)
+        if name is None:
+            return None
+        if os.path.basename(name).lstrip("-") not in SHELLS:
+            return pid
+        pid = parent
+    return None
+
+
+def _process(pid):
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            stat = f.read()
+        name = stat[stat.index("(") + 1:stat.rindex(")")]
+        parent = int(stat[stat.rindex(")") + 2:].split()[1])
+        return name, parent
+    except OSError:
+        pass
+    try:
+        out = subprocess.run(["ps", "-o", "ppid=,comm=", "-p", str(pid)], capture_output=True, text=True, timeout=1).stdout.strip()
+        parent, name = out.split(None, 1)
+        return name, int(parent)
+    except Exception:
+        return None, None
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# hook
+
+def socket_path():
+    """~/.meowdoro/remote.sock, or a private folder in /tmp when the home path is too long for a Unix socket (~104 bytes)."""
+    path = os.path.join(HOME, "remote.sock")
+    if len(path.encode()) < 100:
+        return path
+    folder = f"/tmp/meowdoro-{os.getuid()}"
+    try:
+        os.mkdir(folder, 0o700)
+    except FileExistsError:
+        pass
+    info = os.lstat(folder)
+    # Someone else's folder (or a link) in the shared /tmp: don't use it.
+    if info.st_uid != os.getuid() or (info.st_mode & 0o077) or not os.path.isdir(folder) or os.path.islink(folder):
+        raise OSError("unsafe socket folder")
+    return os.path.join(folder, "remote.sock")
+
+
+def hook(agent):
+    try:
+        if not os.path.exists(CONFIG):
+            return  # not set up (or uninstalled while an agent still had the plugin)
+        raw = sys.stdin.buffer.read(1 << 20)
+        payload = json.loads(raw.decode("utf-8", "replace"))
+        event = compact(agent, payload)
+        if event is None:
+            return
+        event["pid"] = agent_pid()
+        # For the daemon, which reads the context numbers from it; the path itself never leaves the machine.
+        if isinstance(payload.get("transcript_path"), str):
+            event["transcript"] = payload["transcript_path"]
+        event["t"] = time.time()
+        line = (json.dumps(event) + "\n").encode()
+        if not _hand_over(line):
+            _start_daemon()
+            for _ in range(20):
+                time.sleep(0.05)
+                if _hand_over(line):
+                    return
+    except Exception:
+        pass
+
+
+def _hand_over(line):
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            s.connect(socket_path())
+            s.sendall(line)
+        return True
+    except OSError:
+        return False
+
+
+def _start_daemon():
+    try:
+        os.makedirs(HOME, mode=0o700, exist_ok=True)
+        log = open(LOG, "ab")
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "daemon"], stdin=subprocess.DEVNULL,
+                         stdout=log, stderr=log, start_new_session=True, close_fds=True)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# daemon
+
+def _shown(numbers):
+    """What the island shows of the numbers: the context ring's percent and each limit's whole percent."""
+    context, limits = numbers["context"], numbers["limits"]
+    return (context and (context["percent"], context["window"]),
+            limits and tuple((window["minutes"], _rounded(window["percent"])) for window in limits["windows"]))
+
+
+class Daemon:
+    def __init__(self, config):
+        self.relay = config["relay"].rstrip("/")
+        self.channel = config["channel"]
+        self.key = unb64u(config["key"])
+        self.machine = config.get("name") or socket.gethostname().split(".")[0]
+        self.inbox = queue.Queue()
+        self.outbox = queue.Queue(maxsize=500)
+        # "agent:session" -> {"pid", "kind", "sent", "app", "transcript", "read", "context", "shown"}
+        self.sessions = {}
+        # Plan limits per agent: per account, so any of its sessions may bring a newer reading.
+        self.limits = {}
+        self.lock = threading.Lock()
+        self.idle_since = time.time()
+
+    def process(self):
+        """One event at a time, in the order the hooks ran: a slow read must not let "working" overtake "finished"."""
+        while True:
+            try:
+                self.receive(self.inbox.get())
+            except Exception:
+                pass
+
+    def receive(self, event):
+        key = f"{event['agent']}:{event['session_id']}"
+        agent, name = event["agent"], event["hook_event_name"]
+        # Neither leaves the machine: the pid is for liveness, the transcript for the numbers.
+        pid, transcript = event.pop("pid", None), event.pop("transcript", None)
+        now = time.time()
+        with self.lock:
+            self.idle_since = now
+            if name == "SessionEnd":
+                self.sessions.pop(key, None)
+            else:
+                session = self.sessions.setdefault(key, {"pid": None, "kind": None, "sent": 0, "app": None,
+                                                         "transcript": None, "read": 0, "context": None, "shown": None})
+                session["pid"] = pid or session["pid"]
+                if isinstance(transcript, str) and transcript:
+                    session["transcript"] = transcript
+        if name == "SessionEnd":
+            return self.send(dict(event, type="event", machine=self.machine))
+        self.read_numbers(agent, session, name, now)
+        with self.lock:
+            numbers = {"context": session["context"], "limits": self.limits.get(agent)}
+            # A new figure for the island is worth an event of its own.
+            news = _shown(numbers) != session["shown"]
+            app = event.get("mcp_server") or (event.get("tool_name", "").split("__")[1] if event.get("tool_name", "").startswith("mcp__") else None)
+            if name == "PostToolUse" and session["kind"] == "working" and now - session["sent"] < WORKING_RESEND and app == session["app"] and not news:
+                return
+            session["kind"] = "working" if name in WORKING else name
+            session["sent"] = now
+            session["app"] = app or session["app"]
+            session["shown"] = _shown(numbers)
+        # Every event carries the latest numbers, so a Mac that missed some (or restarted) catches up with the next one.
+        self.send(dict(event, type="event", machine=self.machine, **{field: value for field, value in numbers.items() if value}))
+
+    def read_numbers(self, agent, session, name, now):
+        if not session["transcript"] or (name not in READ_NOW and now - session["read"] < READ_EVERY):
+            return
+        session["read"] = now
+        context = read_context(agent, session["transcript"], (session["context"] or {}).get("window"))
+        limits = read_limits(agent, session["transcript"])
+        with self.lock:
+            if context:
+                session["context"] = context
+            if limits and limits["at"] >= (self.limits.get(agent) or {}).get("at", 0):
+                self.limits[agent] = limits
+
+    def send(self, message):
+        try:
+            self.outbox.put_nowait(message)
+        except queue.Full:
+            pass
+
+    def sender(self):
+        backoff = 1
+        while True:
+            message = self.outbox.get()
+            while not self.post(message):
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+            backoff = 1
+
+    def envelope(self, message, nonce=None):
+        """What the relay gets: `{"n": nonce, "c": ciphertext + tag}`, sealed with the channel as associated data."""
+        nonce = nonce or os.urandom(12)
+        # Every message says which protocol and helper made it: the Mac shows the helper version per machine.
+        plaintext = json.dumps(dict(message, v=PROTOCOL, helper=VERSION, t=message.get("t", time.time()))).encode()
+        return json.dumps({"n": b64u(nonce), "c": b64u(seal(self.key, nonce, plaintext, self.channel.encode()))}).encode()
+
+    def post(self, message):
+        request = urllib.request.Request(f"{self.relay}/v1/c/{self.channel}/events", data=self.envelope(message), method="POST",
+                                         headers={"content-type": "application/json", "user-agent": f"meowdoro-remote/{VERSION}"})
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return 200 <= response.status < 300
+        except urllib.error.HTTPError as error:
+            # A malformed event won't get better by retrying; a flood limit or outage will.
+            return error.code not in (429, 500, 502, 503, 504)
+        except Exception:
+            return False
+
+    def watch(self):
+        last_beat = 0
+        while True:
+            time.sleep(LIVENESS_EVERY)
+            now = time.time()
+            closed = []
+            with self.lock:
+                for key, session in list(self.sessions.items()):
+                    if session["pid"] and not alive(session["pid"]):
+                        closed.append(key)
+                        del self.sessions[key]
+                alive_keys = list(self.sessions)
+                if self.sessions:
+                    self.idle_since = now
+                idle = now - self.idle_since
+            for key in closed:
+                agent, session_id = key.split(":", 1)
+                self.send({"type": "event", "agent": agent, "session_id": session_id, "hook_event_name": "SessionEnd",
+                           "project": "—", "machine": self.machine, "t": now})
+            if now - last_beat >= HEARTBEAT_EVERY or closed:
+                self.send({"type": "heartbeat", "machine": self.machine, "sessions": alive_keys, "t": now})
+                last_beat = now
+            if idle > QUIT_AFTER_IDLE and self.outbox.empty():
+                self.send({"type": "heartbeat", "machine": self.machine, "sessions": [], "bye": True, "t": now})
+                time.sleep(3)
+                os._exit(0)
+
+
+def daemon():
+    os.makedirs(HOME, mode=0o700, exist_ok=True)
+    lock = open(LOCK, "a+")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return  # another daemon is running
+    # For setup, which stops a running daemon so the next hook starts one with the new code.
+    lock.truncate(0)
+    lock.write(str(os.getpid()))
+    lock.flush()
+    config = load_config()
+    if not config:
+        return
+    worker = Daemon(config)
+
+    class Handler(socketserver.StreamRequestHandler):
+        def handle(self):
+            for line in self.rfile:
+                try:
+                    worker.inbox.put(json.loads(line))
+                except Exception:
+                    pass
+
+    path = socket_path()
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+    server = socketserver.ThreadingUnixStreamServer(path, Handler)
+    os.chmod(path, 0o600)
+    threading.Thread(target=worker.process, daemon=True).start()
+    threading.Thread(target=worker.sender, daemon=True).start()
+    threading.Thread(target=worker.watch, daemon=True).start()
+    worker.send({"type": "heartbeat", "machine": worker.machine, "sessions": [], "t": time.time()})
+    server.serve_forever()
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# setup / uninstall
+
+def load_config():
+    try:
+        with open(CONFIG) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def setup(relay, code, name=None):
+    data = json.loads(unb64u(code))
+    config = {"relay": relay.rstrip("/"), "channel": data["c"], "key": data["k"], "name": name or data.get("n") or socket.gethostname().split(".")[0]}
+    os.makedirs(HOME, mode=0o700, exist_ok=True)
+    with open(CONFIG, "w") as f:
+        json.dump(config, f)
+    os.chmod(CONFIG, 0o600)
+    stop_daemon()
+    write_plugin(os.path.abspath(__file__))
+    print(f"Meowdoro: this machine shows up as “{config['name']}”.")
+    for agent, install in (("claude", install_claude), ("codex", install_codex)):
+        tool = shutil.which(agent)
+        if tool:
+            ok = install(tool)
+            print(f"  {agent}: {'plugin installed' if ok else 'install failed — see the commands in Meowdoro'}")
+        else:
+            print(f"  {agent}: not found on this machine")
+    print("Agent sessions that are already running pick it up after a restart.")
+    print("Codex runs plugin hooks only after you trust them: /hooks in the Codex CLI.")
+
+
+def stop_daemon():
+    """A running daemon keeps the code it started with: stop it, and the next hook starts one with this code
+    (and the new key)."""
+    try:
+        lock = open(LOCK, "a+")
+    except OSError:
+        return
+    with lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return  # none running
+        except OSError:
+            pass
+        lock.seek(0)
+        pid = lock.read().strip()
+    if pid.isdigit():
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except OSError:
+            pass
+    else:
+        # Helpers before 0.3.0 don't write their pid.
+        run(["pkill", "-u", str(os.getuid()), "-f", "meowdoro-remote daemon"])
+
+
+def write_plugin(script):
+    command = f"python3 {shell_quote(script)} hook"
+    def hook_table(agent):
+        table = {}
+        for event, matcher in HOOKS[agent]:
+            group = {"hooks": [{"type": "command", "command": f"{command} {agent}", "timeout": 3}]}
+            if matcher:
+                group = {"matcher": matcher, **group}
+            table[event] = [group]
+        return table
+    description = "Shows what your coding agents on this machine are doing in the Meowdoro island on your Mac. It only reports status."
+    files = {
+        ".claude-plugin/marketplace.json": {"name": "meowdoro", "owner": {"name": "Meowdoro"}, "plugins": [
+            {"name": "meowdoro", "source": "./plugins/meowdoro", "description": description, "version": VERSION}]},
+        ".agents/plugins/marketplace.json": {"name": "meowdoro", "interface": {"displayName": "Meowdoro"}, "plugins": [
+            {"name": "meowdoro", "source": {"source": "local", "path": "./plugins/meowdoro"},
+             "policy": {"installation": "AVAILABLE", "authentication": "ON_USE"}, "category": "Productivity"}]},
+        "plugins/meowdoro/.claude-plugin/plugin.json": {"name": "meowdoro", "version": VERSION, "description": description,
+                                                         "author": {"name": "Meowdoro"}},
+        "plugins/meowdoro/hooks/hooks.json": {"description": "Meowdoro status hooks: report only.", "hooks": hook_table("claude")},
+        "plugins/meowdoro/.codex-plugin/plugin.json": {"name": "meowdoro", "version": VERSION, "description": description,
+                                                        "author": {"name": "Meowdoro"}, "hooks": {"hooks": hook_table("codex")},
+                                                        "interface": {"displayName": "Meowdoro", "category": "Productivity"}},
+    }
+    for path, content in files.items():
+        full = os.path.join(PLUGINS, path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w") as f:
+            json.dump(content, f, indent=2)
+
+
+def install_claude(tool):
+    return run([tool, "plugin", "install", "meowdoro", "--marketplace", PLUGINS, "--scope", "user"])
+
+
+def install_codex(tool):
+    run([tool, "plugin", "marketplace", "add", PLUGINS])
+    return run([tool, "plugin", "add", "meowdoro@meowdoro"])
+
+
+def uninstall():
+    # The config goes first, so no hook starts a new daemon meanwhile; then the running one, which would keep
+    # the key in memory and the machine online on the Mac until it quits after ten idle minutes.
+    try:
+        os.unlink(CONFIG)
+    except FileNotFoundError:
+        pass
+    stop_daemon()
+    for agent, args in (("claude", ["plugin", "uninstall", "meowdoro@meowdoro", "--scope", "user"]), ("codex", ["plugin", "remove", "meowdoro@meowdoro"])):
+        tool = shutil.which(agent)
+        if tool:
+            run([tool] + args)
+            run([tool, "plugin", "marketplace", "remove", "meowdoro"])
+    for path in (socket_path(), LOCK):
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+    shutil.rmtree(PLUGINS, ignore_errors=True)
+    print("Meowdoro: removed from this machine.")
+
+
+def run(args):
+    try:
+        return subprocess.run(args, capture_output=True, timeout=120).returncode == 0
+    except Exception:
+        return False
+
+
+def shell_quote(text):
+    return "'" + text.replace("'", "'\\''") + "'"
+
+
+def main(argv):
+    if len(argv) >= 3 and argv[1] == "hook":
+        hook(argv[2])
+    elif len(argv) >= 2 and argv[1] == "daemon":
+        daemon()
+    elif len(argv) >= 4 and argv[1] == "setup":
+        setup(argv[2], argv[3], argv[4] if len(argv) > 4 else None)
+    elif len(argv) >= 2 and argv[1] == "uninstall":
+        uninstall()
+    else:
+        print(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
