@@ -23,6 +23,7 @@ Python 3.8+, standard library only. Files: ~/.meowdoro/ (remote.json, remote.soc
 import base64
 import calendar
 import fcntl
+import fnmatch
 import json
 import math
 import os
@@ -50,7 +51,7 @@ PLUGIN = "meowdoro-remote"
 PLUGIN_ID = f"{PLUGIN}@{PLUGIN}"
 # Helpers before 0.5.0 installed theirs from PLUGINS under the app's name; setup and uninstall take that one away.
 OLD_PLUGIN = "meowdoro"
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 # What the Mac decodes. Changes to the messages only ever add fields; a change old Meowdoros can't read bumps this,
 # and they then say "needs a newer Meowdoro" for this machine instead of guessing.
 PROTOCOL = 1
@@ -625,17 +626,23 @@ class Target:
         plaintext = json.dumps(dict(message, v=PROTOCOL, helper=VERSION, t=message.get("t", time.time()))).encode()
         return json.dumps({"n": b64u(nonce), "c": b64u(seal(self.key, nonce, plaintext, self.channel.encode()))}).encode()
 
-    def post(self, message):
+    def deliver(self, message, timeout=10):
+        """POSTs one message: the relay's HTTP status, or None when it can't be reached."""
         request = urllib.request.Request(f"{self.relay}/v1/c/{self.channel}/events", data=self.envelope(message), method="POST",
                                          headers={"content-type": "application/json", "user-agent": f"meowdoro-remote/{VERSION}"})
         try:
-            with urllib.request.urlopen(request, timeout=10) as response:
-                return 200 <= response.status < 300
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return response.status
         except urllib.error.HTTPError as error:
-            # A malformed event won't get better by retrying; a flood limit or outage will.
-            return error.code not in (429, 500, 502, 503, 504)
+            return error.code
         except Exception:
-            return False
+            return None
+
+    def post(self, message):
+        """Done with this message: delivered, or refused for good. A malformed event won't get better by retrying;
+        a flood limit or an outage will."""
+        status = self.deliver(message)
+        return status is not None and status not in (429, 500, 502, 503, 504)
 
 
 class Daemon:
@@ -805,6 +812,123 @@ def targets_of(config):
     return []
 
 
+# Where to look for each agent: the list Meowdoro on the Mac uses too (AgentLocations.swift). remote/publish.sh puts
+# app/Packages/MeowdoroCore/Sources/MeowdoroCore/Resources/agent-locations.json in place of None; run from the
+# repository, the helper reads that file. Its "about" has the rules; find_agent follows them like the app does.
+AGENT_LOCATIONS = json.loads('{"about":["Where to look for each agent\'s command-line tool, for Meowdoro on the Mac (AgentLocations.swift) and the remote helper (remote/meowdoro-remote, which remote/publish.sh fills with this file). One list for both: add a place here, not in code.","In order, the first executable file wins: 1) the PATH; 2) paths; 3) on a Mac, macPaths, where * is one path component and matches are tried newest version first; 4) on a Mac, macApps: each app found by bundle ID wherever it is (else the fallback paths), the paths inside it, then a file called search anywhere under Contents/Resources (5 levels).","~ is the home folder. macApps without inside or search only tell that the agent\'s desktop app is there."],"agents":{"claude":{"paths":["~/.local/bin/claude","~/.claude/local/claude","/opt/homebrew/bin/claude","/usr/local/bin/claude","~/.npm-global/bin/claude","~/.bun/bin/claude"],"macPaths":["~/Library/Application Support/Claude/claude-code/*/*/claude.app/Contents/MacOS/claude"],"macApps":[{"bundleIDs":["com.anthropic.claudefordesktop"],"fallback":["/Applications/Claude.app"]}]},"codex":{"paths":["~/.local/bin/codex","/opt/homebrew/bin/codex","/usr/local/bin/codex","~/.npm-global/bin/codex","~/.bun/bin/codex"],"macPaths":[],"macApps":[{"bundleIDs":["com.openai.codex","com.openai.chat"],"fallback":["/Applications/ChatGPT.app","/Applications/Codex.app"],"inside":["Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex","Contents/Resources/codex-cli/bin/codex","Contents/Resources/codex"],"search":"codex"}]}}}')
+LOCATIONS_FILE = os.path.join("app", "Packages", "MeowdoroCore", "Sources", "MeowdoroCore", "Resources", "agent-locations.json")
+
+
+def agent_locations():
+    """MEOWDORO_AGENT_LOCATIONS names another list (tests: one that finds nothing outside their fake home)."""
+    try:
+        if os.environ.get("MEOWDORO_AGENT_LOCATIONS"):
+            with open(os.environ["MEOWDORO_AGENT_LOCATIONS"]) as f:
+                return json.load(f)
+        if AGENT_LOCATIONS is not None:
+            return AGENT_LOCATIONS
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", LOCATIONS_FILE)) as f:
+            return json.load(f)
+    except Exception:
+        return {"agents": {}}  # PATH only
+
+
+def find_agent(agent, home=None, mac=None, apps=None):
+    """The agent's command: the first executable file among agent_candidates."""
+    return next((place for place in agent_candidates(agent, home, mac, apps) if _executable(place)), None)
+
+
+def agent_candidates(agent, home=None, mac=None, apps=None):
+    """Every place to try, in order: the PATH, paths, then on a Mac macPaths (newest version first) and macApps
+    (found by bundle ID, else the fallback paths; the paths inside, then a file called search under Resources)."""
+    home = home or os.path.expanduser("~")
+    mac = sys.platform == "darwin" if mac is None else mac
+    apps = apps or _apps_with_bundle_id
+    places = [os.path.join(folder, agent) for folder in os.environ.get("PATH", "").split(os.pathsep) if folder]
+    spec = agent_locations().get("agents", {}).get(agent)
+    if not spec:
+        return places
+    places += [_expand_home(path, home) for path in spec.get("paths", [])]
+    if not mac:
+        return places
+    for pattern in spec.get("macPaths", []):
+        places += _glob_newest_first(_expand_home(pattern, home))
+    for entry in spec.get("macApps", []):
+        for app in _app_folders(entry, apps):
+            places += [os.path.join(app, inside) for inside in entry.get("inside", [])]
+            if entry.get("search"):
+                places += _search(entry["search"], os.path.join(app, "Contents", "Resources"))
+    return places
+
+
+def _app_folders(entry, apps):
+    folders = []
+    for bundle_id in entry.get("bundleIDs", []):
+        folders += [app for app in apps(bundle_id) if app not in folders]
+    folders += [path for path in entry.get("fallback", []) if path not in folders and os.path.isdir(path)]
+    return folders
+
+
+def _apps_with_bundle_id(bundle_id):
+    """Every copy of the app with this bundle ID, by Spotlight."""
+    try:
+        found = subprocess.run(["mdfind", f"kMDItemCFBundleIdentifier == '{bundle_id}'"], capture_output=True, text=True, timeout=5)
+        return [path for path in found.stdout.split("\n") if path.endswith(".app")]
+    except Exception:
+        return []
+
+
+def _expand_home(path, home):
+    return home if path == "~" else home + path[1:] if path.startswith("~/") else path
+
+
+def _natural(text):
+    """"2.1.299" after "2.1.95", as the app's numeric compare sorts them."""
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", text)]
+
+
+def _glob_newest_first(pattern):
+    """* matches one path component (no hidden entries); matches newest version first."""
+    matches = [""]
+    for component in [part for part in pattern.split("/") if part]:
+        found = []
+        for base in matches:
+            if "*" in component:
+                try:
+                    entries = os.listdir(base or "/")
+                except OSError:
+                    entries = []
+                found += [base + "/" + entry for entry in entries if not entry.startswith(".") and fnmatch.fnmatchcase(entry, component)]
+            else:
+                found.append(base + "/" + component)
+        matches = found
+    return sorted(matches, key=_natural, reverse=True)
+
+
+def _search(name, folder):
+    """Executable files called name under folder, at most 5 levels down, in path order."""
+    found = []
+    for root, folders, files in os.walk(folder):
+        # Files here are depth + 1 levels down, as the app's enumerator counts: up to 5.
+        depth = 0 if root == folder else os.path.relpath(root, folder).count(os.sep) + 1
+        if depth >= 4:
+            folders[:] = []
+        found += [os.path.join(root, file) for file in files if file == name and _executable(os.path.join(root, file))]
+    return sorted(found)
+
+
+def _executable(path):
+    return os.path.isfile(path) and os.access(path, os.X_OK)
+
+
+def _whose(tool):
+    """" (the copy in ChatGPT)" for a desktop app's copy, which the user may not know is there; nothing for PATH."""
+    if "/Application Support/Claude/" in tool:
+        return " (the copy in Claude Desktop)"
+    app = next((part for part in tool.split("/") if part.endswith(".app") and part != "claude.app" and part != "CodexCLI.app"), None)
+    return f" (the copy in {app[:-4]})" if app else ""
+
+
 def setup(relay, code, name=None):
     """Adds the Meowdoro whose line this is to the ones this machine sends to. The same line again (same channel)
     replaces its entry instead: a new relay address, an update."""
@@ -816,11 +940,18 @@ def setup(relay, code, name=None):
     config = {"name": name or old.get("name") or data.get("n") or socket.gethostname().split(".")[0], "targets": targets[-MAX_TARGETS:]}
     save_config(config)
     stop_daemon()
-    tools = [(agent, shutil.which(agent)) for agent in ("claude", "codex")]
+    tools = [(agent, find_agent(agent)) for agent in ("claude", "codex")]
     # Before the folder gets the new plugin: the agents may still read the old one while removing it.
     replaced = {agent for agent, tool in tools if tool and remove_old_plugin(agent, tool)}
     write_plugin(os.path.abspath(__file__))
     print(f"Meowdoro: this machine shows up as “{config['name']}”.")
+    # Hello to the Mac whose line this is: it lists this machine in Settings now, not only after an agent's first event.
+    target = Target(config["targets"][-1])
+    status = target.deliver({"type": "heartbeat", "machine": config["name"], "sessions": [], "t": time.time()}, timeout=8)
+    if status is not None and 200 <= status < 300:
+        print("  Your Mac can see it now: Settings → Remote agents.")
+    else:
+        print(f"  Couldn't reach the relay ({status or 'no answer'} from {target.relay}); it shows up once it can.")
     if len(config["targets"]) > 1:
         print(f"  It sends to {len(config['targets'])} Meowdoros now: meowdoro-remote list")
     if dropped > 0:
@@ -829,9 +960,9 @@ def setup(relay, code, name=None):
         if tool:
             ok = (install_claude if agent == "claude" else install_codex)(tool)
             note = f" (replaces {OLD_PLUGIN}@{OLD_PLUGIN} from an older helper)" if agent in replaced else ""
-            print(f"  {agent}: {'plugin installed' if ok else 'install failed — see the commands in Meowdoro'}{note}")
+            print(f"  {agent}: {'plugin installed' if ok else 'install failed — see the commands in Meowdoro'}{_whose(tool)}{note}")
         else:
-            print(f"  {agent}: not found on this machine")
+            print(f"  {agent}: not found on this machine (looked on PATH, in the usual install folders and desktop apps)")
     print("Agent sessions that are already running pick it up after a restart.")
     print("Codex runs plugin hooks only after you trust them: /hooks in the Codex CLI.")
 
@@ -1010,7 +1141,7 @@ def uninstall():
     stop_daemon()
     # Only the helper's own plugins: a Meowdoro running on this machine keeps meowdoro@meowdoro.
     for agent, args in (("claude", ["plugin", "uninstall", PLUGIN_ID, "--scope", "user"]), ("codex", ["plugin", "remove", PLUGIN_ID])):
-        tool = shutil.which(agent)
+        tool = find_agent(agent)
         if tool:
             remove_old_plugin(agent, tool)
             run([tool] + args)

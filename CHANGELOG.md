@@ -2,6 +2,12 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Helper 0.5.1 — 2026-10-22
+
+- Finds Claude Code and Codex that aren't on PATH: the copy Claude Desktop keeps of Claude Code, the codex inside ChatGPT (wherever the app is), and the usual install folders (`~/.local/bin`, Homebrew, npm, Bun). Before, a Mac that runs them only from those apps got "not found" and no plugin. Run the line again to pick this up.
+- The places it looks are the same list Meowdoro on the Mac uses, built into the helper.
+- Says hello right after setup: the Mac lists the machine in Settings → Remote agents at once, before any agent runs there, and the setup line tells you whether the relay could be reached.
+
 ## Meowdoro 0.1.8 — 2026-10-22
 
 - **Count down or up:** Settings → Timer → Count. The digits, the ring and the bar show the time left or the time gone.
