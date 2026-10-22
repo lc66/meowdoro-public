@@ -10,8 +10,12 @@
           numbers to the event. Encrypts each event (AES-256-GCM, key from the setup command; the relay only
           sees ciphertext), sends it, retries, checks every 15 s that the agents are still running, and sends
           a heartbeat every minute.
-- setup:  `meowdoro-remote setup <relay-url> <code>` saves the relay, channel and key, then asks Claude Code
-          and Codex to install the Meowdoro plugin (their own commands). `uninstall` removes it again.
+- setup:  `meowdoro-remote setup <relay-url> <code>` adds that Meowdoro's relay, channel and key to the ones this
+          machine sends to (each Mac's line adds its Mac; the same line again replaces it), then asks Claude Code
+          and Codex to install the helper's plugin, meowdoro-remote (their own commands). One plugin, however many
+          Macs: the daemon seals each event with each Mac's key. `list` shows them, `remove <number>` drops one,
+          `uninstall` removes everything. A Meowdoro running on this machine too keeps its own plugin, meowdoro:
+          each hook goes to both.
 
 Python 3.8+, standard library only. Files: ~/.meowdoro/ (remote.json, remote.sock, remote.lock, remote.log, agent-plugins/).
 """
@@ -33,6 +37,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 HOME = os.path.expanduser("~/.meowdoro")
@@ -40,7 +45,12 @@ CONFIG = os.path.join(HOME, "remote.json")
 LOCK = os.path.join(HOME, "remote.lock")
 LOG = os.path.join(HOME, "remote.log")
 PLUGINS = os.path.join(HOME, "agent-plugins")
-VERSION = "0.4.1"
+# The plugin and its marketplace. Agents allow one marketplace per name, and `meowdoro` is the Mac app's own.
+PLUGIN = "meowdoro-remote"
+PLUGIN_ID = f"{PLUGIN}@{PLUGIN}"
+# Helpers before 0.5.0 installed theirs from PLUGINS under the app's name; setup and uninstall take that one away.
+OLD_PLUGIN = "meowdoro"
+VERSION = "0.5.0"
 # What the Mac decodes. Changes to the messages only ever add fields; a change old Meowdoros can't read bumps this,
 # and they then say "needs a newer Meowdoro" for this machine instead of guessing.
 PROTOCOL = 1
@@ -48,6 +58,8 @@ PROTOCOL = 1
 LIVENESS_EVERY = 15
 HEARTBEAT_EVERY = 60
 QUIT_AFTER_IDLE = 10 * 60
+# Meowdoros one machine sends to. A line from one more drops the oldest: likely a Mac that made a new key since.
+MAX_TARGETS = 8
 # Between replies an agent fires a hook per tool call; one "still working" a minute is enough.
 WORKING_RESEND = 60
 # The transcript is read for its numbers after a reply or a (re)start, and between replies at most this often.
@@ -325,8 +337,12 @@ def _claude_entry(line):
     return (tokens, model) if tokens > 0 else None
 
 
+def claude_config_dir():
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+
+
 def claude_catalog_dir():
-    return os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"), "cache", "model-catalog")
+    return os.path.join(claude_config_dir(), "cache", "model-catalog")
 
 
 def _modified(path):
@@ -577,14 +593,56 @@ def _shown(numbers):
             limits and tuple((window["minutes"], _rounded(window["percent"])) for window in limits["windows"]))
 
 
+class Target:
+    """One Meowdoro this machine sends to: its relay, channel and key, with a queue and retries of its own, so a relay
+    that's down for one Mac doesn't hold up the others."""
+
+    def __init__(self, target):
+        self.relay = target["relay"].rstrip("/")
+        self.channel = target["channel"]
+        self.key = unb64u(target["key"])
+        self.outbox = queue.Queue(maxsize=500)
+
+    def send(self, message):
+        try:
+            self.outbox.put_nowait(message)
+        except queue.Full:
+            pass
+
+    def sender(self):
+        backoff = 1
+        while True:
+            message = self.outbox.get()
+            while not self.post(message):
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+            backoff = 1
+
+    def envelope(self, message, nonce=None):
+        """What the relay gets: `{"n": nonce, "c": ciphertext + tag}`, sealed with the channel as associated data."""
+        nonce = nonce or os.urandom(12)
+        # Every message says which protocol and helper made it: the Mac shows the helper version per machine.
+        plaintext = json.dumps(dict(message, v=PROTOCOL, helper=VERSION, t=message.get("t", time.time()))).encode()
+        return json.dumps({"n": b64u(nonce), "c": b64u(seal(self.key, nonce, plaintext, self.channel.encode()))}).encode()
+
+    def post(self, message):
+        request = urllib.request.Request(f"{self.relay}/v1/c/{self.channel}/events", data=self.envelope(message), method="POST",
+                                         headers={"content-type": "application/json", "user-agent": f"meowdoro-remote/{VERSION}"})
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return 200 <= response.status < 300
+        except urllib.error.HTTPError as error:
+            # A malformed event won't get better by retrying; a flood limit or outage will.
+            return error.code not in (429, 500, 502, 503, 504)
+        except Exception:
+            return False
+
+
 class Daemon:
     def __init__(self, config):
-        self.relay = config["relay"].rstrip("/")
-        self.channel = config["channel"]
-        self.key = unb64u(config["key"])
+        self.targets = [Target(target) for target in targets_of(config)]
         self.machine = config.get("name") or socket.gethostname().split(".")[0]
         self.inbox = queue.Queue()
-        self.outbox = queue.Queue(maxsize=500)
         # "agent:session" -> {"pid", "kind", "sent", "app", "transcript", "read", "context", "shown"}
         self.sessions = {}
         # Plan limits per agent: per account, so any of its sessions may bring a newer reading.
@@ -646,38 +704,9 @@ class Daemon:
                 self.limits[agent] = limits
 
     def send(self, message):
-        try:
-            self.outbox.put_nowait(message)
-        except queue.Full:
-            pass
-
-    def sender(self):
-        backoff = 1
-        while True:
-            message = self.outbox.get()
-            while not self.post(message):
-                time.sleep(backoff)
-                backoff = min(backoff * 2, 60)
-            backoff = 1
-
-    def envelope(self, message, nonce=None):
-        """What the relay gets: `{"n": nonce, "c": ciphertext + tag}`, sealed with the channel as associated data."""
-        nonce = nonce or os.urandom(12)
-        # Every message says which protocol and helper made it: the Mac shows the helper version per machine.
-        plaintext = json.dumps(dict(message, v=PROTOCOL, helper=VERSION, t=message.get("t", time.time()))).encode()
-        return json.dumps({"n": b64u(nonce), "c": b64u(seal(self.key, nonce, plaintext, self.channel.encode()))}).encode()
-
-    def post(self, message):
-        request = urllib.request.Request(f"{self.relay}/v1/c/{self.channel}/events", data=self.envelope(message), method="POST",
-                                         headers={"content-type": "application/json", "user-agent": f"meowdoro-remote/{VERSION}"})
-        try:
-            with urllib.request.urlopen(request, timeout=10) as response:
-                return 200 <= response.status < 300
-        except urllib.error.HTTPError as error:
-            # A malformed event won't get better by retrying; a flood limit or outage will.
-            return error.code not in (429, 500, 502, 503, 504)
-        except Exception:
-            return False
+        """To every Meowdoro this machine sends to, each sealed with its own key."""
+        for target in self.targets:
+            target.send(message)
 
     def watch(self):
         last_beat = 0
@@ -701,7 +730,7 @@ class Daemon:
             if now - last_beat >= HEARTBEAT_EVERY or closed:
                 self.send({"type": "heartbeat", "machine": self.machine, "sessions": alive_keys, "t": now})
                 last_beat = now
-            if idle > QUIT_AFTER_IDLE and self.outbox.empty():
+            if idle > QUIT_AFTER_IDLE and all(target.outbox.empty() for target in self.targets):
                 self.send({"type": "heartbeat", "machine": self.machine, "sessions": [], "bye": True, "t": now})
                 time.sleep(3)
                 os._exit(0)
@@ -719,7 +748,7 @@ def daemon():
     lock.write(str(os.getpid()))
     lock.flush()
     config = load_config()
-    if not config:
+    if not targets_of(config):
         return
     worker = Daemon(config)
 
@@ -739,7 +768,8 @@ def daemon():
     server = socketserver.ThreadingUnixStreamServer(path, Handler)
     os.chmod(path, 0o600)
     threading.Thread(target=worker.process, daemon=True).start()
-    threading.Thread(target=worker.sender, daemon=True).start()
+    for target in worker.targets:
+        threading.Thread(target=target.sender, daemon=True).start()
     threading.Thread(target=worker.watch, daemon=True).start()
     worker.send({"type": "heartbeat", "machine": worker.machine, "sessions": [], "t": time.time()})
     server.serve_forever()
@@ -756,21 +786,50 @@ def load_config():
         return None
 
 
-def setup(relay, code, name=None):
-    data = json.loads(unb64u(code))
-    config = {"relay": relay.rstrip("/"), "channel": data["c"], "key": data["k"], "name": name or data.get("n") or socket.gethostname().split(".")[0]}
+def save_config(config):
     os.makedirs(HOME, mode=0o700, exist_ok=True)
     with open(CONFIG, "w") as f:
         json.dump(config, f)
     os.chmod(CONFIG, 0o600)
+
+
+def targets_of(config):
+    """The Meowdoros this machine sends to: `{"name", "targets": [{"relay", "channel", "key", "added"}]}`.
+    Before 0.5.0, remote.json held one, as top-level relay, channel and key."""
+    if not config:
+        return []
+    if "targets" in config:
+        return [target for target in config["targets"] if target.get("relay") and target.get("channel") and target.get("key")]
+    if config.get("channel"):
+        return [{"relay": config["relay"], "channel": config["channel"], "key": config["key"]}]
+    return []
+
+
+def setup(relay, code, name=None):
+    """Adds the Meowdoro whose line this is to the ones this machine sends to. The same line again (same channel)
+    replaces its entry instead: a new relay address, an update."""
+    data = json.loads(unb64u(code))
+    old = load_config() or {}
+    targets = [target for target in targets_of(old) if target["channel"] != data["c"]]
+    targets.append({"relay": relay.rstrip("/"), "channel": data["c"], "key": data["k"], "added": int(time.time())})
+    dropped = len(targets) - MAX_TARGETS
+    config = {"name": name or old.get("name") or data.get("n") or socket.gethostname().split(".")[0], "targets": targets[-MAX_TARGETS:]}
+    save_config(config)
     stop_daemon()
+    tools = [(agent, shutil.which(agent)) for agent in ("claude", "codex")]
+    # Before the folder gets the new plugin: the agents may still read the old one while removing it.
+    replaced = {agent for agent, tool in tools if tool and remove_old_plugin(agent, tool)}
     write_plugin(os.path.abspath(__file__))
     print(f"Meowdoro: this machine shows up as “{config['name']}”.")
-    for agent, install in (("claude", install_claude), ("codex", install_codex)):
-        tool = shutil.which(agent)
+    if len(config["targets"]) > 1:
+        print(f"  It sends to {len(config['targets'])} Meowdoros now: meowdoro-remote list")
+    if dropped > 0:
+        print(f"  At most {MAX_TARGETS}: the oldest one was dropped.")
+    for agent, tool in tools:
         if tool:
-            ok = install(tool)
-            print(f"  {agent}: {'plugin installed' if ok else 'install failed — see the commands in Meowdoro'}")
+            ok = (install_claude if agent == "claude" else install_codex)(tool)
+            note = f" (replaces {OLD_PLUGIN}@{OLD_PLUGIN} from an older helper)" if agent in replaced else ""
+            print(f"  {agent}: {'plugin installed' if ok else 'install failed — see the commands in Meowdoro'}{note}")
         else:
             print(f"  {agent}: not found on this machine")
     print("Agent sessions that are already running pick it up after a restart.")
@@ -813,19 +872,22 @@ def write_plugin(script):
             table[event] = [group]
         return table
     description = "Shows what your coding agents on this machine are doing in the Meowdoro island on your Mac. It only reports status."
+    folder = f"plugins/{PLUGIN}"
     files = {
-        ".claude-plugin/marketplace.json": {"name": "meowdoro", "owner": {"name": "Meowdoro"}, "plugins": [
-            {"name": "meowdoro", "source": "./plugins/meowdoro", "description": description, "version": VERSION}]},
-        ".agents/plugins/marketplace.json": {"name": "meowdoro", "interface": {"displayName": "Meowdoro"}, "plugins": [
-            {"name": "meowdoro", "source": {"source": "local", "path": "./plugins/meowdoro"},
+        ".claude-plugin/marketplace.json": {"name": PLUGIN, "owner": {"name": "Meowdoro"}, "plugins": [
+            {"name": PLUGIN, "source": f"./{folder}", "description": description, "version": VERSION}]},
+        ".agents/plugins/marketplace.json": {"name": PLUGIN, "interface": {"displayName": "Meowdoro Remote"}, "plugins": [
+            {"name": PLUGIN, "source": {"source": "local", "path": f"./{folder}"},
              "policy": {"installation": "AVAILABLE", "authentication": "ON_USE"}, "category": "Productivity"}]},
-        "plugins/meowdoro/.claude-plugin/plugin.json": {"name": "meowdoro", "version": VERSION, "description": description,
-                                                         "author": {"name": "Meowdoro"}},
-        "plugins/meowdoro/hooks/hooks.json": {"description": "Meowdoro status hooks: report only.", "hooks": hook_table("claude")},
-        "plugins/meowdoro/.codex-plugin/plugin.json": {"name": "meowdoro", "version": VERSION, "description": description,
-                                                        "author": {"name": "Meowdoro"}, "hooks": {"hooks": hook_table("codex")},
-                                                        "interface": {"displayName": "Meowdoro", "category": "Productivity"}},
+        f"{folder}/.claude-plugin/plugin.json": {"name": PLUGIN, "version": VERSION, "description": description,
+                                                 "author": {"name": "Meowdoro"}},
+        f"{folder}/hooks/hooks.json": {"description": "Meowdoro remote status hooks: report only.", "hooks": hook_table("claude")},
+        f"{folder}/.codex-plugin/plugin.json": {"name": PLUGIN, "version": VERSION, "description": description,
+                                                "author": {"name": "Meowdoro"}, "hooks": {"hooks": hook_table("codex")},
+                                                "interface": {"displayName": "Meowdoro Remote", "category": "Productivity"}},
     }
+    # Where helpers before 0.5.0 kept the plugin.
+    shutil.rmtree(os.path.join(PLUGINS, "plugins", OLD_PLUGIN), ignore_errors=True)
     for path, content in files.items():
         full = os.path.join(PLUGINS, path)
         os.makedirs(os.path.dirname(full), exist_ok=True)
@@ -834,12 +896,108 @@ def write_plugin(script):
 
 
 def install_claude(tool):
-    return run([tool, "plugin", "install", "meowdoro", "--marketplace", PLUGINS, "--scope", "user"])
+    return run([tool, "plugin", "install", PLUGIN, "--marketplace", PLUGINS, "--scope", "user"])
 
 
 def install_codex(tool):
+    # Adding a marketplace that is already there fails harmlessly; the install is what counts.
     run([tool, "plugin", "marketplace", "add", PLUGINS])
-    return run([tool, "plugin", "add", "meowdoro@meowdoro"])
+    return run([tool, "plugin", "add", PLUGIN_ID])
+
+
+def remove_old_plugin(agent, tool):
+    """Takes away the meowdoro@meowdoro an older helper installed, but only when its marketplace is this helper's
+    folder: the same name from anywhere else is Meowdoro's own plugin on this machine. True when it was there."""
+    folder = marketplace_folder(agent, tool, OLD_PLUGIN)
+    if not folder or not same_folder(folder, PLUGINS):
+        return False
+    old_id = f"{OLD_PLUGIN}@{OLD_PLUGIN}"
+    run([tool, "plugin", "uninstall", old_id, "--scope", "user"] if agent == "claude" else [tool, "plugin", "remove", old_id])
+    run([tool, "plugin", "marketplace", "remove", OLD_PLUGIN])
+    return True
+
+
+def marketplace_folder(agent, tool, name):
+    """The folder the agent's marketplace `name` comes from, or None: from the agent's own listing, or, when that
+    can't say (older versions), from what it wrote when the marketplace was added."""
+    try:
+        result = subprocess.run([tool, "plugin", "marketplace", "list", "--json"], capture_output=True, timeout=120)
+        listed = json.loads(result.stdout) if result.returncode == 0 else None
+    except Exception:
+        listed = None
+    # Claude Code: [{"name", "path", ...}]. Codex: {"marketplaces": [{"name", "root", "marketplaceSource": {"source"}}]}.
+    entries = listed.get("marketplaces") if isinstance(listed, dict) else listed
+    if not isinstance(entries, list):
+        return configured_marketplace_folder(agent, name)
+    for entry in entries:
+        if isinstance(entry, dict) and entry.get("name") == name:
+            source = entry.get("marketplaceSource") if isinstance(entry.get("marketplaceSource"), dict) else {}
+            folder = entry.get("path") or entry.get("root") or source.get("source")
+            return folder if isinstance(folder, str) else None
+    return None
+
+
+def configured_marketplace_folder(agent, name):
+    """Claude Code's plugins/known_marketplaces.json, or `source` under [marketplaces.<name>] in Codex's config.toml."""
+    try:
+        if agent == "claude":
+            with open(os.path.join(claude_config_dir(), "plugins", "known_marketplaces.json")) as f:
+                entry = json.load(f).get(name) or {}
+            folder = (entry.get("source") or {}).get("path") or entry.get("installLocation")
+            return folder if isinstance(folder, str) else None
+        with open(os.path.join(os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex"), "config.toml")) as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return None
+    section = None
+    for line in (line.strip() for line in lines):
+        if line.startswith("["):
+            section = line.replace(" ", "")
+        elif section in (f"[marketplaces.{name}]", f'[marketplaces."{name}"]'):
+            # A TOML basic string (JSON's escapes, near enough) or a literal one.
+            found = re.match(r"""source\s*=\s*(?:("(?:[^"\\]|\\.)*")|'([^']*)')""", line)
+            if found:
+                try:
+                    return json.loads(found.group(1)) if found.group(1) else found.group(2)
+                except ValueError:
+                    return None
+    return None
+
+
+def same_folder(a, b):
+    # Claude Code keeps the path it was given, Codex the resolved one.
+    return os.path.realpath(os.path.expanduser(a)) == os.path.realpath(b)
+
+
+def list_targets():
+    config = load_config()
+    targets = targets_of(config)
+    if not targets:
+        print("Meowdoro: not set up on this machine.")
+        return
+    print(f"Meowdoro: this machine shows up as “{config.get('name') or socket.gethostname().split('.')[0]}” and sends to:")
+    for number, target in enumerate(targets, 1):
+        added = time.strftime("%Y-%m-%d %H:%M", time.localtime(target["added"])) if target.get("added") else "before 0.5.0"
+        host = urllib.parse.urlsplit(target["relay"]).netloc or target["relay"]
+        print(f"  {number}. {host}, channel {target['channel'][:6]}…, added {added}")
+    print("Stop sending to one: meowdoro-remote remove <number>")
+
+
+def remove(number):
+    """Stops sending to one Meowdoro, e.g. one that turned remote agents off or made a new key. The last one goes
+    with the whole helper."""
+    config = load_config()
+    targets = targets_of(config)
+    if not number.isdigit() or not 1 <= int(number) <= len(targets):
+        print(f"Meowdoro: no {number} in the list (meowdoro-remote list).")
+        return
+    del targets[int(number) - 1]
+    if not targets:
+        print("Meowdoro: that was the only one.")
+        return uninstall()
+    save_config({"name": config.get("name"), "targets": targets})
+    stop_daemon()  # the next hook starts one that sends to the rest
+    print(f"Meowdoro: removed. This machine sends to {len(targets)} Meowdoro{'s' if len(targets) > 1 else ''} now.")
 
 
 def uninstall():
@@ -850,11 +1008,13 @@ def uninstall():
     except FileNotFoundError:
         pass
     stop_daemon()
-    for agent, args in (("claude", ["plugin", "uninstall", "meowdoro@meowdoro", "--scope", "user"]), ("codex", ["plugin", "remove", "meowdoro@meowdoro"])):
+    # Only the helper's own plugins: a Meowdoro running on this machine keeps meowdoro@meowdoro.
+    for agent, args in (("claude", ["plugin", "uninstall", PLUGIN_ID, "--scope", "user"]), ("codex", ["plugin", "remove", PLUGIN_ID])):
         tool = shutil.which(agent)
         if tool:
+            remove_old_plugin(agent, tool)
             run([tool] + args)
-            run([tool, "plugin", "marketplace", "remove", "meowdoro"])
+            run([tool, "plugin", "marketplace", "remove", PLUGIN])
     for path in (socket_path(), LOCK):
         try:
             os.unlink(path)
@@ -882,6 +1042,10 @@ def main(argv):
         daemon()
     elif len(argv) >= 4 and argv[1] == "setup":
         setup(argv[2], argv[3], argv[4] if len(argv) > 4 else None)
+    elif len(argv) >= 2 and argv[1] == "list":
+        list_targets()
+    elif len(argv) >= 3 and argv[1] == "remove":
+        remove(argv[2])
     elif len(argv) >= 2 and argv[1] == "uninstall":
         uninstall()
     else:

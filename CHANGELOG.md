@@ -2,6 +2,14 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Helper 0.5.0 — 2026-10-22
+
+- The helper's plugin is now called `meowdoro-remote`, so it works next to Meowdoro's own plugin on a machine that runs Meowdoro too (a Mac VM, say): agents there show up both in that machine's island and on your Mac. Before, whichever was installed second didn't take, and the other Meowdoro's Settings could count the helper's plugin as its own.
+- Running the line again replaces the `meowdoro@meowdoro` plugin older helpers installed. A plugin of that name that came from Meowdoro itself is left alone.
+- `meowdoro-remote uninstall` removes only the helper's plugin.
+- Codex asks you to trust the hooks again (`/hooks`): they belong to a new plugin now.
+- **Several Macs can watch the same machine.** Run each Mac's line there: it adds that Mac instead of replacing the one before, and every event goes to each of them, sealed with its own key. Up to 8; one more drops the oldest. `meowdoro-remote list` shows them, `meowdoro-remote remove <number>` stops sending to one.
+
 ## Meowdoro 0.1.6 — 2026-10-21
 
 The first public test version.

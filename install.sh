@@ -9,8 +9,8 @@
 # (In the source repository the two values are placeholders; remote/publish.sh fills them in.)
 set -eu
 
-HELPER_VERSION="0.4.1"
-HELPER_SHA256="bd44410bd0b38a766b7a1e62c08022a9de1afae9d8e47d67d227c5eccbb5fc13"
+HELPER_VERSION="0.5.0"
+HELPER_SHA256="b02e9628c13bc6734e5572daa2af851f0961b41b311e6499bedb4946545d2ae6"
 BASE="${MEOWDORO_HELPER_BASE:-https://raw.githubusercontent.com/lc66/meowdoro-public/helper-v$HELPER_VERSION}"
 
 case "$HELPER_SHA256" in

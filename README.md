@@ -66,7 +66,9 @@ curl -fsSL https://raw.githubusercontent.com/lc66/meowdoro-public/main/install.s
 - Needs `python3` (3.8+, standard library only) and `curl`.
 - `install.sh` downloads the helper of its own release by tag and runs it only if its SHA-256 matches.
 - `<code>` carries the channel and the encryption key made on your Mac; it is saved to `~/.meowdoro/remote.json` (owner-only).
-- The Meowdoro plugin is installed into Claude Code and Codex with their own commands. Running sessions pick it up after a restart; Codex runs plugin hooks only after you trust them (`/hooks`).
+- The helper's plugin, `meowdoro-remote`, is installed into Claude Code and Codex with their own commands. Running sessions pick it up after a restart; Codex runs plugin hooks only after you trust them (`/hooks`).
+- On a machine that runs Meowdoro too (a Mac VM, say), its own plugin and the helper's work side by side: the agents there show up in that machine's island and on your Mac.
+- Several Macs can watch the same machine: run each Mac's line there. The helper sends to all of them (up to 8), each sealed with its own key. `python3 ~/.meowdoro/bin/meowdoro-remote list` shows them, `… remove <number>` stops one.
 - Update: run the line again. Remove: `python3 ~/.meowdoro/bin/meowdoro-remote uninstall`.
 
 ### What leaves that machine
