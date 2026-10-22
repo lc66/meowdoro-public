@@ -24,15 +24,17 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
 
 - Focus, short break and long break: 25, 5 and 15 minutes, the long break after 4 rounds. All of it is adjustable.
 - A cat sits next to the notch: at its laptop during focus, with a mug on a break. When a phase ends, the island slides out with a bigger cat and what comes next. No Dock icon, no notifications: the island is the notification.
-- The time in the notch as digits, a ring or a bar. It flashes when a minute is left.
-- After a phase ends the time keeps counting up (+3:12) until you start the next one, or the next phase starts on its own.
+- The time in the notch as digits, a ring or a bar, counting down or up. It flashes when a minute is left.
+- After a phase ends the time keeps counting up (+3:12) until you start the next one, or the next phase starts on its own. After 4 hours with nothing running (a night away), the timer starts over from the first round.
+- Click "Focus" in the island to name what you're working on.
+- If you want, a focus pauses after 5 minutes without keyboard or mouse, or during a call (camera or microphone in use), with the time rewound to when it began. Both are off by default.
 - A purr, a beep or nothing when a phase ends, at its own volume.
-- Do Not Disturb during focus, through two Shortcuts (only Shortcuts can switch a Focus on macOS).
+- Do Not Disturb during focus, through two Shortcuts (only Shortcuts can switch a Focus on macOS). "Add Do Not Disturb shortcuts" in Settings adds Meowdoro's own in two clicks.
 - On the screen with the notch or on the main display; it can hide over full-screen apps.
 
 ### Your agents at a glance
 
-Claude Code (in the terminal or Claude Desktop) and Codex (in the terminal or ChatGPT) show up in the island. Settings → Agents on this Mac → Connect installs a small plugin into each.
+Claude Code (in the terminal or Claude Desktop) and Codex (in the terminal or ChatGPT) show up in the island. Settings → Agents on this Mac shows a tile for each agent it finds, with a green ring once it's connected; Connect (or "Connect all…") installs a small plugin into each.
 
 - Every session with what it's doing: working, waiting for you, finished, failed. A click opens it in Claude Desktop or ChatGPT.
 - A ring shows how full each session's context is. Past a threshold (50% by default), the break card suggests `/compact`.
@@ -42,7 +44,10 @@ Claude Code (in the terminal or Claude Desktop) and Codex (in the terminal or Ch
 
 ### Statistics
 
-The day, the week or the month: focus time, finished sessions, rest, and the work-to-rest ratio, with a chart by hour or by day. Focus time is split by project: the project of the agent you last prompted or opened from the island.
+The day, the week or the month: focus time, finished sessions, rest, and the work-to-rest ratio, with a chart by hour or by day.
+
+- **Projects:** a focus with agents on screen counts in full for every project worked on during it: its agents did something, or you wrote to them or opened their session. Reading an agent's answer counts too: if no agent moved during the focus, it goes to the ones that finished in the break before it. With agents hidden, a focus counts for no project.
+- **Journal:** every focus and break of the day, with its name and projects. Rename a focus, or delete a record entered by mistake.
 
 ### Privacy
 

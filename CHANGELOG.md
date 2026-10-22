@@ -2,6 +2,19 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.8 — 2026-10-22
+
+- **Count down or up:** Settings → Timer → Count. The digits, the ring and the bar show the time left or the time gone.
+- **Name your focus:** click "Focus" in the island and type what it's for.
+- **Session journal** in Statistics: every focus and break of the day, with its name and projects. Rename a focus, or delete a record entered by mistake.
+- **Projects, counted more simply:** a focus with agents on screen counts in full for every project worked on during it, reading an agent's answer included. With agents hidden, it counts for none.
+- **Auto-pause** (off by default): a focus pauses after 5 minutes without keyboard or mouse, or during a call (camera or microphone in use), with the time rewound to when it began.
+- **A fresh start after a night away:** after 4 hours with nothing running, the timer starts over from the first round instead of counting hours of overtime.
+- **Agents on this Mac:** a tile per agent with its mark and a green ring once connected. Meowdoro finds Claude Code and Codex by itself (Codex inside ChatGPT too, wherever the app is); "Connect all…" connects them in one go.
+- **Do Not Disturb during focus:** "Add Do Not Disturb shortcuts" adds Meowdoro's two shortcuts in two clicks.
+- The round dots stand in for the "round 1 of 4" text, and the island's "Today · …" line is gone: those numbers are in Statistics.
+- A phase that has started keeps its length when you change the settings.
+
 ## Helper 0.5.0 — 2026-10-22
 
 - The helper's plugin is now called `meowdoro-remote`, so it works next to Meowdoro's own plugin on a machine that runs Meowdoro too (a Mac VM, say): agents there show up both in that machine's island and on your Mac. Before, whichever was installed second didn't take, and the other Meowdoro's Settings could count the helper's plugin as its own.
