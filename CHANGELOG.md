@@ -2,6 +2,12 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.9 — 2026-10-22
+
+- **Auto-pause says so:** when a focus pauses by itself, the island slides out a card with why, and a cat in a headset for a call or asleep on its laptop when you're away. When you're back or the call is over, the same cat offers Start.
+- **Do Not Disturb turns off on a Mac in any language.** The shortcut named "Do Not Disturb" in English, and Shortcuts looked it up by that name. If you added Meowdoro's shortcuts before, delete "Meowdoro Focus Off" in the Shortcuts app and add them again from Settings.
+- Meowdoro looks for Claude Code and Codex in the same places as the helper for remote machines: one list for both.
+
 ## Helper 0.5.1 — 2026-10-22
 
 - Finds Claude Code and Codex that aren't on PATH: the copy Claude Desktop keeps of Claude Code, the codex inside ChatGPT (wherever the app is), and the usual install folders (`~/.local/bin`, Homebrew, npm, Bun). Before, a Mac that runs them only from those apps got "not found" and no plugin. Run the line again to pick this up.
