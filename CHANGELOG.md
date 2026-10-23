@@ -2,6 +2,22 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.10 — 2026-10-23
+
+- **Agents grouped by agent:** Claude, then Codex. A session on another machine carries the machine's name after its status, instead of a group per machine.
+- **Read sessions dim:** a finished or failed session you've seen — clicked, in the list you opened, or read in Claude Desktop or ChatGPT on this Mac — dims, stops counting on the badge, and leaves the list 15 minutes later.
+- **Questions wait:** when Claude Desktop marks a session with a yellow dot (its turn ended on a question for you, not a permission prompt), the island shows it as waiting, with the question, until you answer.
+- **Settings → Remote agents** shows each machine's Claude Code and Codex: connected, waiting for you to trust Codex's hooks, or not there; and says when a machine's helper is out of date. Needs helper 0.6.0 there.
+- An agent's header shows this Mac's plan limits only: a remote machine may run on another account.
+
+## Helper 0.6.0 — 2026-10-23
+
+- A finished session you read on this machine — opened in Claude Desktop after the reply, or opened in ChatGPT — tells your Mac, and the island shows it as read (dimmed) there too. Needs a Meowdoro that knows read sessions; older ones ignore it.
+- Tells your Mac which agents have its plugin: Settings → Remote agents shows the Claude Code and Codex tiles under each machine (connected, found without the plugin, or not found).
+- Checks whether Codex there still waits for you to trust its hooks (/hooks): the Codex tile turns orange, and the island says so.
+- A session Claude Desktop shows with a yellow dot — the turn ended on a question for you — shows as waiting in the island too, with the question.
+- An agent installed on the machine later gets the plugin by itself; one you switched off stays off.
+
 ## Meowdoro 0.1.9 — 2026-10-22
 
 - **Auto-pause says so:** when a focus pauses by itself, the island slides out a card with why, and a cat in a headset for a call or asleep on its laptop when you're away. When you're back or the call is over, the same cat offers Start.

@@ -36,9 +36,10 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
 
 Claude Code (in the terminal or Claude Desktop) and Codex (in the terminal or ChatGPT) show up in the island. Settings → Agents on this Mac shows a tile for each agent it finds, with a green ring once it's connected; Connect (or "Connect all…") installs a small plugin into each.
 
-- Every session with what it's doing: working, waiting for you, finished, failed. A click opens it in Claude Desktop or ChatGPT.
+- Every session with what it's doing: working, waiting for you, finished, failed, grouped by agent. A click opens it in Claude Desktop or ChatGPT.
+- A session you've read — in the island, or in Claude Desktop or ChatGPT — dims and leaves 15 minutes later. One whose turn ended on a question for you (Claude Desktop's yellow dot) waits, with the question.
 - A ring shows how full each session's context is. Past a threshold (50% by default), the break card suggests `/compact`.
-- Codex's 5-hour and weekly limits, and when they'd run out at the current pace.
+- Codex's 5-hour and weekly limits on this Mac, and when they'd run out at the current pace.
 - Sessions that work in Figma, Canva and other design tools over MCP say so: "→ Figma", and a right-click opens the Figma file.
 - During focus, agent updates can wait until you peek; during breaks they always wait. Meowdoro only listens: it never approves anything and never slows an agent down.
 
@@ -72,14 +73,15 @@ curl -fsSL https://raw.githubusercontent.com/lc66/meowdoro-public/main/install.s
 - `install.sh` downloads the helper of its own release by tag and runs it only if its SHA-256 matches.
 - `<code>` carries the channel and the encryption key made on your Mac; it is saved to `~/.meowdoro/remote.json` (owner-only).
 - It finds Claude Code and Codex on PATH, in the usual install folders, and on a Mac inside Claude Desktop and ChatGPT too. Right after setup your Mac lists the machine in Settings → Remote agents.
-- The helper's plugin, `meowdoro-remote`, is installed into Claude Code and Codex with their own commands. Running sessions pick it up after a restart; Codex runs plugin hooks only after you trust them (`/hooks`).
+- The helper's plugin, `meowdoro-remote`, is installed into Claude Code and Codex with their own commands. Running sessions pick it up after a restart; Codex runs plugin hooks only after you trust them (`/hooks`), and your Mac says so until you do. An agent installed there later gets the plugin by itself; one you switch off stays off.
+- Settings → Remote agents shows each machine's agents: connected, waiting for Codex's hooks to be trusted, or not there.
 - On a machine that runs Meowdoro too (a Mac VM, say), its own plugin and the helper's work side by side: the agents there show up in that machine's island and on your Mac.
 - Several Macs can watch the same machine: run each Mac's line there. The helper sends to all of them (up to 8), each sealed with its own key. `python3 ~/.meowdoro/bin/meowdoro-remote list` shows them, `… remove <number>` stops one.
-- Update: run the line again. Remove: `python3 ~/.meowdoro/bin/meowdoro-remote uninstall`.
+- Update: run the line again (Settings says when a newer helper is out; it never updates itself). Remove: `python3 ~/.meowdoro/bin/meowdoro-remote uninstall`.
 
 ### What leaves that machine
 
-Only status: agent, session id, event (working / waiting / finished / error / closed), project name (the git repository's folder name), the session's title, a tool's name when it asks for permission or is an MCP tool, how full the session's context is, Codex's plan limits, the machine's name, the helper's version, a timestamp. Never prompts, tool inputs or outputs, file contents, paths or the agent's replies. Everything is encrypted with AES-256-GCM before it leaves; the relay can't read it.
+Only status: agent, session id, event (working / waiting / finished / error / closed), project name (the git repository's folder name), the session's title, a tool's name when it asks for permission or is an MCP tool, how full the session's context is, Codex's plan limits, whether you've read a finished session there, the question Claude Desktop says a turn ended on (its own one-line summary), which agents have the plugin, the machine's name, the helper's version, a timestamp. Never prompts, tool inputs or outputs, file contents, paths or the agent's replies. Everything is encrypted with AES-256-GCM before it leaves; the relay can't read it.
 
 ## Versions
 

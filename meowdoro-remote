@@ -8,8 +8,9 @@
 - daemon: started by the first hook and gone ten minutes after the last session closes. Reads how full each
           session's context is (and Codex's plan limits) from the end of its transcript and adds only those
           numbers to the event. Encrypts each event (AES-256-GCM, key from the setup command; the relay only
-          sees ciphertext), sends it, retries, checks every 15 s that the agents are still running, and sends
-          a heartbeat every minute.
+          sees ciphertext), sends it, retries, checks every 15 s that the agents are still running and whether
+          a finished session was read in Claude Desktop or ChatGPT here, and sends a heartbeat every minute
+          (with which agents have the plugin, for the Mac's Settings).
 - setup:  `meowdoro-remote setup <relay-url> <code>` adds that Meowdoro's relay, channel and key to the ones this
           machine sends to (each Mac's line adds its Mac; the same line again replaces it), then asks Claude Code
           and Codex to install the helper's plugin, meowdoro-remote (their own commands). One plugin, however many
@@ -29,6 +30,7 @@ import math
 import os
 import queue
 import re
+import select
 import shutil
 import signal
 import socket
@@ -51,7 +53,7 @@ PLUGIN = "meowdoro-remote"
 PLUGIN_ID = f"{PLUGIN}@{PLUGIN}"
 # Helpers before 0.5.0 installed theirs from PLUGINS under the app's name; setup and uninstall take that one away.
 OLD_PLUGIN = "meowdoro"
-VERSION = "0.5.1"
+VERSION = "0.6.0"
 # What the Mac decodes. Changes to the messages only ever add fields; a change old Meowdoros can't read bumps this,
 # and they then say "needs a newer Meowdoro" for this machine instead of guessing.
 PROTOCOL = 1
@@ -77,6 +79,14 @@ HOOKS = {
               ("Stop", None), ("Interrupt", None), ("SessionEnd", None)],
 }
 WORKING = {"UserPromptSubmit", "PostToolUse", "PermissionDenied", "SubagentStart"}
+# A reply that waits to be read: the island shows it until it's read (in the island, or in the agent's app here).
+FINISHED = {"Stop", "StopFailure"}
+# Which agents have the plugin: looked up again this often (a missing agent means searching the disk).
+AGENTS_EVERY = 10 * 60
+# ChatGPT puts a new reply on its unread list unless the thread is open: give it this long to write the list.
+CHATGPT_UNREAD_DELAY = 60
+# Claude Desktop sums up a turn seconds after it ends; past this, there won't be a summary.
+CLAUDE_SUMMARY_WAIT = 10 * 60
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -342,6 +352,10 @@ def claude_config_dir():
     return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 
 
+def codex_config_dir():
+    return os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
+
+
 def claude_catalog_dir():
     return os.path.join(claude_config_dir(), "cache", "model-catalog")
 
@@ -519,6 +533,202 @@ def alive(pid):
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# Read in the agent's app, and which agents have the plugin. The same rules as the app's AppReadState.swift and
+# AgentConnections.swift, for this machine.
+
+def claude_desktop_session_file(session_id, home=None):
+    """Claude Desktop's local_<uuid>.json for this Claude Code session (its cliSessionId), or None."""
+    folder = os.path.join(home or os.path.expanduser("~"), "Library", "Application Support", "Claude", "claude-code-sessions")
+    for root, _, files in os.walk(folder):
+        for name in files:
+            if not (name.startswith("local_") and name.endswith(".json")):
+                continue
+            path = os.path.join(root, name)
+            try:
+                with open(path) as f:
+                    if json.load(f).get("cliSessionId") == session_id:
+                        return path
+            except Exception:
+                pass
+    return None
+
+
+def claude_desktop_last_focused(path):
+    """When the session was last opened in Claude Desktop (lastFocusedAt, milliseconds), in seconds; None if unknown.
+    It notes the moment a session is opened, not how long it stays open."""
+    try:
+        with open(path) as f:
+            millis = json.load(f).get("lastFocusedAt")
+        return millis / 1000 if isinstance(millis, (int, float)) and not isinstance(millis, bool) else None
+    except Exception:
+        return None
+
+
+def claude_desktop_turn_summary(path):
+    """What Claude Desktop made of the session's last turn (postTurnSummary): (the reply it is about, the question
+    when the turn ended on one — "blocked", the yellow dot in its sidebar — else None). None when there's none."""
+    try:
+        with open(path) as f:
+            summary = json.load(f).get("postTurnSummary")
+        reply = summary.get("summarizes_uuid")
+        if not isinstance(reply, str):
+            return None
+        if summary.get("status_category") != "blocked":
+            return reply, None
+        asked = summary.get("needs_action").strip() if isinstance(summary.get("needs_action"), str) else ""
+        return reply, (asked[:200] or "has a question")
+    except Exception:
+        return None
+
+
+def _claude_reply_uuid(line):
+    if b'"assistant"' not in line:
+        return None
+    entry = _json(line)
+    if not entry or entry.get("type") != "assistant" or entry.get("isSidechain") is True:
+        return None
+    return entry.get("uuid") if isinstance(entry.get("uuid"), str) else None
+
+
+def claude_last_reply(transcript):
+    """The id of the session's last reply (subagents aside): what Claude Desktop's turn summary is about."""
+    return last_line(transcript, _claude_reply_uuid)
+
+
+def chatgpt_unread(codex_home=None):
+    """The Codex threads ChatGPT lists as unread: electron-thread-read-state-v1.unreadByIdentity (account → host →
+    thread ids) in .codex-global-state.json. None when it can't be read. (Codex's own thread_read_receipts table
+    looks like the place, but ChatGPT doesn't clear it on reading.)"""
+    try:
+        with open(os.path.join(codex_home or codex_config_dir(), ".codex-global-state.json")) as f:
+            accounts = json.load(f)["electron-thread-read-state-v1"]["unreadByIdentity"]
+        unread = set()
+        for hosts in accounts.values():
+            for threads in (hosts.values() if isinstance(hosts, dict) else []):
+                unread.update(thread for thread in (threads if isinstance(threads, list) else []) if isinstance(thread, str))
+        return unread
+    except Exception:
+        return None
+
+
+def chatgpt_read(on_list, saw_unread, finished, now):
+    """Read in ChatGPT: off its unread list after being on it, or never put there (the thread was open)."""
+    return not on_list and (saw_unread or now - finished >= CHATGPT_UNREAD_DELAY)
+
+
+def inside_codex_desktop(pid):
+    """Codex runs inside ChatGPT (or the Codex app): its process is a program in that app's bundle."""
+    name = _process(pid)[0] if pid else None
+    return bool(name) and ("/ChatGPT.app/" in name or "/Codex.app/" in name)
+
+
+def plugin_state(agent):
+    """This helper's plugin in the agent's config: "on", "off" (installed, switched off) or None (not installed).
+    Claude Code: enabledPlugins in settings.json. Codex: [plugins."meowdoro-remote@meowdoro-remote"] in config.toml,
+    where enabled = false means switched off."""
+    try:
+        if agent == "claude":
+            with open(os.path.join(claude_config_dir(), "settings.json")) as f:
+                enabled = (json.load(f).get("enabledPlugins") or {}).get(PLUGIN_ID)
+            return None if enabled is None else "on" if enabled is True else "off"
+        with open(os.path.join(codex_config_dir(), "config.toml")) as f:
+            lines = [line.strip() for line in f.read().splitlines()]
+    except Exception:
+        return None
+    state, section = None, False
+    for line in lines:
+        if line.startswith("["):
+            section = line == f'[plugins."{PLUGIN_ID}"]'
+            state = "on" if section and state is None else state
+        elif section and line.replace(" ", "") == "enabled=false":
+            state = "off"
+    return state
+
+
+def plugin_enabled(agent):
+    return plugin_state(agent) == "on"
+
+
+def codex_hooks_waiting(tool, timeout=15):
+    """How many of this helper's hooks Codex skips until the user trusts them (/hooks in Codex, ChatGPT → Settings →
+    Hooks), as `codex app-server` tells through hooks/list — the same question the app asks (CodexHookReview.swift).
+    None when it can't tell."""
+    messages = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"clientInfo": {"name": "meowdoro-remote", "version": VERSION}}},
+                {"jsonrpc": "2.0", "method": "initialized"},
+                {"jsonrpc": "2.0", "id": 2, "method": "hooks/list", "params": {"cwds": [os.path.expanduser("~")]}}]
+    try:
+        process = subprocess.Popen([tool, "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except Exception:
+        return None
+    try:
+        # Stdin stays open until the reply: on EOF it quits without answering.
+        process.stdin.write("".join(json.dumps(message) + "\n" for message in messages).encode())
+        process.stdin.flush()
+        deadline, buffer = time.time() + timeout, b""
+        while time.time() < deadline:
+            ready, _, _ = select.select([process.stdout], [], [], max(0, deadline - time.time()))
+            if not ready:
+                break
+            chunk = os.read(process.stdout.fileno(), 1 << 16)
+            if not chunk:
+                break
+            buffer += chunk
+            *lines, buffer = buffer.split(b"\n")
+            for line in lines:
+                message = _json(line)
+                if not message or message.get("id") != 2 or not isinstance(message.get("result"), dict):
+                    continue
+                entries = message["result"].get("data") or []
+                hooks = entries[0].get("hooks") if entries and isinstance(entries[0], dict) else []
+                ours = [hook for hook in hooks or [] if isinstance(hook, dict) and hook.get("pluginId") == PLUGIN_ID]
+                return sum(1 for hook in ours if hook.get("trustStatus") in ("untrusted", "modified"))
+        return None
+    except Exception:
+        return None
+    finally:
+        try:
+            process.kill()
+            process.wait(timeout=5)
+            process.stdin.close()
+            process.stdout.close()
+        except Exception:
+            pass
+
+
+def agent_states(connect=False, tried=None, previous=None):
+    """For the Mac's Settings: each agent with this helper's plugin on ("connected", or for Codex "needs_approval"
+    while it skips the hooks), found here without it ("not_connected"), or not on this machine ("not_found").
+    With `connect`, an agent found here that never had the plugin gets it, once per agent in `tried` (setup said
+    this machine's agents go to the Mac; one the user switched off stays off). Codex's approval is asked again only
+    while it was missing: once trusted, it stays so until the plugin changes, which only setup does."""
+    states = {}
+    for agent, folder in (("claude", claude_config_dir()), ("codex", codex_config_dir())):
+        state = plugin_state(agent)
+        tool = None
+        if state is None and connect and agent not in (tried if tried is not None else set()):
+            tool = find_agent(agent)
+            if tool:
+                if tried is not None:
+                    tried.add(agent)
+                if not os.path.isfile(os.path.join(PLUGINS, ".claude-plugin", "marketplace.json")):
+                    write_plugin(os.path.abspath(__file__))
+                ok = (install_claude if agent == "claude" else install_codex)(tool)
+                print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {agent} found{_whose(tool)}: plugin {'installed' if ok else 'install failed'}", flush=True)
+                state = plugin_state(agent)
+        if state == "on":
+            states[agent] = "connected"
+            if agent == "codex" and (previous or {}).get("codex") != "connected":
+                codex = tool or find_agent("codex")
+                # Couldn't tell: say nothing rather than send the user looking for a problem that may not be there.
+                states[agent] = "needs_approval" if codex and codex_hooks_waiting(codex) else "connected"
+        elif state == "off" or os.path.isdir(folder) or tool or find_agent(agent):
+            states[agent] = "not_connected"
+        else:
+            states[agent] = "not_found"
+    return states
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # hook
 
 def socket_path():
@@ -650,12 +860,18 @@ class Daemon:
         self.targets = [Target(target) for target in targets_of(config)]
         self.machine = config.get("name") or socket.gethostname().split(".")[0]
         self.inbox = queue.Queue()
-        # "agent:session" -> {"pid", "kind", "sent", "app", "transcript", "read", "context", "shown"}
+        # "agent:session" -> {"pid", "kind", "sent", "app", "transcript", "read", "context", "shown",
+        #                     "finished", "read_sent", "saw_unread", "file", "in_app", "summarized"} (see check_apps)
         self.sessions = {}
         # Plan limits per agent: per account, so any of its sessions may bring a newer reading.
         self.limits = {}
         self.lock = threading.Lock()
         self.idle_since = time.time()
+        # agent_states(), refreshed every AGENTS_EVERY; ChatGPT's unread list as of its file's last change.
+        self.agents, self.agents_at = None, 0
+        # Agents this daemon already tried to give the plugin.
+        self.tried = set()
+        self.chatgpt = None
 
     def process(self):
         """One event at a time, in the order the hooks ran: a slow read must not let "working" overtake "finished"."""
@@ -677,7 +893,9 @@ class Daemon:
                 self.sessions.pop(key, None)
             else:
                 session = self.sessions.setdefault(key, {"pid": None, "kind": None, "sent": 0, "app": None,
-                                                         "transcript": None, "read": 0, "context": None, "shown": None})
+                                                         "transcript": None, "read": 0, "context": None, "shown": None,
+                                                         "finished": None, "read_sent": False, "saw_unread": False,
+                                                         "file": None, "in_app": None, "summarized": None})
                 session["pid"] = pid or session["pid"]
                 if isinstance(transcript, str) and transcript:
                     session["transcript"] = transcript
@@ -692,6 +910,11 @@ class Daemon:
             if name == "PostToolUse" and session["kind"] == "working" and now - session["sent"] < WORKING_RESEND and app == session["app"] and not news:
                 return
             session["kind"] = "working" if name in WORKING else name
+            if name in FINISHED:
+                # When the reply came, by this machine's clock, like the apps' notes on reading it.
+                session.update(finished=event.get("t", now), read_sent=False, saw_unread=False, summarized=None)
+            else:
+                session["finished"] = None
             session["sent"] = now
             session["app"] = app or session["app"]
             session["shown"] = _shown(numbers)
@@ -734,13 +957,99 @@ class Daemon:
                 agent, session_id = key.split(":", 1)
                 self.send({"type": "event", "agent": agent, "session_id": session_id, "hook_event_name": "SessionEnd",
                            "project": "—", "machine": self.machine, "t": now})
+            try:
+                self.check_apps(now)
+            except Exception:
+                pass
+            if now - self.agents_at >= AGENTS_EVERY:
+                try:
+                    self.agents = agent_states(connect=True, tried=self.tried, previous=self.agents)
+                except Exception:
+                    pass
+                self.agents_at = now
             if now - last_beat >= HEARTBEAT_EVERY or closed:
-                self.send({"type": "heartbeat", "machine": self.machine, "sessions": alive_keys, "t": now})
+                self.send(self.heartbeat(alive_keys, now))
                 last_beat = now
             if idle > QUIT_AFTER_IDLE and all(target.outbox.empty() for target in self.targets):
-                self.send({"type": "heartbeat", "machine": self.machine, "sessions": [], "bye": True, "t": now})
+                self.send(dict(self.heartbeat([], now), bye=True))
                 time.sleep(3)
                 os._exit(0)
+
+    def heartbeat(self, sessions, now):
+        message = {"type": "heartbeat", "machine": self.machine, "sessions": sessions, "t": now}
+        if self.agents:
+            message["agents"] = self.agents
+        return message
+
+    def check_apps(self, now, home=None, codex_home=None):
+        """What Claude Desktop and ChatGPT on this machine say about finished sessions, told to each Mac once (the
+        app's own check, AgentHub.checkAgentApps, has the same rules):
+        - read: Claude Desktop opened the session after the reply (lastFocusedAt); ChatGPT took the thread off its
+          unread list, or never put it there (only threads running inside ChatGPT: a terminal one never is).
+        - question: Claude Desktop's summary of this very reply says it ended on a question for the user (its yellow
+          dot), with what it asks. The summary comes seconds after the reply; looked for up to CLAUDE_SUMMARY_WAIT."""
+        with self.lock:
+            waiting = [(key, dict(session)) for key, session in self.sessions.items() if session["finished"] and (
+                not session["read_sent"] or (key.startswith("claude:") and session["summarized"] is None
+                                             and now - session["finished"] < CLAUDE_SUMMARY_WAIT))]
+        if not waiting:
+            return
+        finished = {key: session["finished"] for key, session in waiting}
+        updates, read, questions = {}, [], {}
+        for key, session in waiting:
+            agent, session_id = key.split(":", 1)
+            change = {}
+            if agent == "claude":
+                path = session["file"]
+                if path is None:
+                    path = change["file"] = claude_desktop_session_file(session_id, home) or False
+                if path and not session["read_sent"]:
+                    focused = claude_desktop_last_focused(path)
+                    if focused is not None and focused > session["finished"]:
+                        read.append(key)
+                if path and session["summarized"] is None and session["transcript"]:
+                    summary = claude_desktop_turn_summary(path)
+                    # Until Claude Desktop sums up this reply, its file still holds the last turn's summary.
+                    if summary and summary[0] == claude_last_reply(session["transcript"]):
+                        change["summarized"] = True
+                        if summary[1]:
+                            questions[key] = summary[1]
+            elif agent == "codex" and not session["read_sent"]:
+                in_app = session["in_app"]
+                if in_app is None:
+                    in_app = change["in_app"] = inside_codex_desktop(session["pid"])
+                unread = self.chatgpt_unread(codex_home) if in_app else None
+                if unread is not None:
+                    on_list = session_id in unread
+                    if on_list:
+                        change["saw_unread"] = True
+                    if chatgpt_read(on_list, session["saw_unread"], session["finished"], now):
+                        read.append(key)
+            updates[key] = change
+        with self.lock:
+            for key, change in updates.items():
+                if key in self.sessions and self.sessions[key]["finished"] == finished[key]:
+                    self.sessions[key].update(change, **({"read_sent": True} if key in read else {}))
+                else:
+                    # A new event came meanwhile: this was about a reply that's no longer the last.
+                    read = [k for k in read if k != key]
+                    questions.pop(key, None)
+        for key, question in questions.items():
+            agent, session_id = key.split(":", 1)
+            self.send({"type": "question", "agent": agent, "session_id": session_id, "machine": self.machine, "question": question, "t": now})
+        for key in read:
+            agent, session_id = key.split(":", 1)
+            self.send({"type": "read", "agent": agent, "session_id": session_id, "machine": self.machine, "t": now})
+
+    def chatgpt_unread(self, codex_home=None):
+        """chatgpt_unread(), read again only when its file changes: it's large (hundreds of kilobytes)."""
+        modified = _modified(os.path.join(codex_home or codex_config_dir(), ".codex-global-state.json"))
+        if not self.chatgpt or self.chatgpt[0] != modified:
+            unread = chatgpt_unread(codex_home)
+            if unread is None:
+                return None
+            self.chatgpt = (modified, unread)
+        return self.chatgpt[1]
 
 
 def daemon():
@@ -963,6 +1272,9 @@ def setup(relay, code, name=None):
             print(f"  {agent}: {'plugin installed' if ok else 'install failed — see the commands in Meowdoro'}{_whose(tool)}{note}")
         else:
             print(f"  {agent}: not found on this machine (looked on PATH, in the usual install folders and desktop apps)")
+    if status is not None and 200 <= status < 300:
+        # Which agents have the plugin now: their tiles under this machine in the Mac's Settings.
+        target.deliver({"type": "heartbeat", "machine": config["name"], "sessions": [], "agents": agent_states(), "t": time.time()}, timeout=8)
     print("Agent sessions that are already running pick it up after a restart.")
     print("Codex runs plugin hooks only after you trust them: /hooks in the Codex CLI.")
 
@@ -1076,7 +1388,7 @@ def configured_marketplace_folder(agent, name):
                 entry = json.load(f).get(name) or {}
             folder = (entry.get("source") or {}).get("path") or entry.get("installLocation")
             return folder if isinstance(folder, str) else None
-        with open(os.path.join(os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex"), "config.toml")) as f:
+        with open(os.path.join(codex_config_dir(), "config.toml")) as f:
             lines = f.read().splitlines()
     except Exception:
         return None
