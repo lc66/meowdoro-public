@@ -2,6 +2,16 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.11 — 2026-10-23
+
+- A question in Claude Desktop's next-step box (the Code tab's sessions) shows as waiting too: those sessions get no turn summary, which is all 0.1.10 looked at. On remote machines this needs helper 0.6.1.
+- Read sessions are dimmed less, so they stay easy to read.
+
+## Helper 0.6.1 — 2026-10-23
+
+- A question in Claude Desktop's next-step box (the Code tab's sessions) now shows as waiting on your Mac too. Those sessions get no turn summary, which is all 0.6.0 looked at.
+- Once you trust Codex's hooks, the Mac stops asking within a minute (it was up to ten), or at Codex's next event.
+
 ## Meowdoro 0.1.10 — 2026-10-23
 
 - **Agents grouped by agent:** Claude, then Codex. A session on another machine carries the machine's name after its status, instead of a group per machine.

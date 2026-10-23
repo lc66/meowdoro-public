@@ -53,7 +53,7 @@ PLUGIN = "meowdoro-remote"
 PLUGIN_ID = f"{PLUGIN}@{PLUGIN}"
 # Helpers before 0.5.0 installed theirs from PLUGINS under the app's name; setup and uninstall take that one away.
 OLD_PLUGIN = "meowdoro"
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 # What the Mac decodes. Changes to the messages only ever add fields; a change old Meowdoros can't read bumps this,
 # and they then say "needs a newer Meowdoro" for this machine instead of guessing.
 PROTOCOL = 1
@@ -87,6 +87,8 @@ AGENTS_EVERY = 10 * 60
 CHATGPT_UNREAD_DELAY = 60
 # Claude Desktop sums up a turn seconds after it ends; past this, there won't be a summary.
 CLAUDE_SUMMARY_WAIT = 10 * 60
+# While Codex waits for its hooks to be trusted, asked again this often: the user is likely doing it right now.
+APPROVAL_EVERY = 60
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -590,6 +592,38 @@ def _claude_reply_uuid(line):
     return entry.get("uuid") if isinstance(entry.get("uuid"), str) else None
 
 
+def _claude_turn_box_entry(line):
+    if b"wrap_up" not in line and b'"user"' not in line:
+        return None
+    entry = _json(line)
+    message = entry.get("message") if entry and entry.get("isSidechain") is not True else None
+    if not isinstance(message, dict):
+        return None
+    content = message.get("content")
+    if entry.get("type") == "assistant":
+        calls = [item for item in (content if isinstance(content, list) else []) if isinstance(item, dict)
+                 and item.get("type") == "tool_use" and str(item.get("name", "")).endswith("wrap_up")]
+        if not calls:
+            return None
+        ask = (calls[-1].get("input") or {}).get("ask")
+        ask = ask.strip()[:200] if isinstance(ask, str) else ""
+        return ("box", ask or None)
+    if entry.get("type") == "user":
+        # A tool's result or Claude Code's own note isn't the user speaking; anything else starts a new turn.
+        if entry.get("isMeta") is True or (isinstance(content, list) and any(isinstance(item, dict) and item.get("type") == "tool_result" for item in content)):
+            return None
+        return ("prompt", None)
+    return None
+
+
+def claude_turn_box(transcript):
+    """The next-step box a Code-tab session in Claude Desktop ends a turn with (its …wrap_up tool call): (True, the
+    question in its ask, or None). Claude Desktop shows such a session with a yellow dot and writes no turn summary
+    for it. None: the last turn has no box (ClaudeTurnBox in AgentContext.swift, the same reading)."""
+    found = last_line(transcript, _claude_turn_box_entry)
+    return (True, found[1]) if found and found[0] == "box" else None
+
+
 def claude_last_reply(transcript):
     """The id of the session's last reply (subagents aside): what Claude Desktop's turn summary is about."""
     return last_line(transcript, _claude_reply_uuid)
@@ -869,8 +903,10 @@ class Daemon:
         self.idle_since = time.time()
         # agent_states(), refreshed every AGENTS_EVERY; ChatGPT's unread list as of its file's last change.
         self.agents, self.agents_at = None, 0
-        # Agents this daemon already tried to give the plugin.
+        # Agents this daemon already tried to give the plugin; when Codex's approval was last asked; a heartbeat due now.
         self.tried = set()
+        self.approval_at = 0
+        self.beat_now = False
         self.chatgpt = None
 
     def process(self):
@@ -899,6 +935,10 @@ class Daemon:
                 session["pid"] = pid or session["pid"]
                 if isinstance(transcript, str) and transcript:
                     session["transcript"] = transcript
+        if agent == "codex" and (self.agents or {}).get("codex") == "needs_approval":
+            # This came through the helper's own hook: Codex runs them, so they're trusted now.
+            self.agents = dict(self.agents, codex="connected")
+            self.beat_now = True
         if name == "SessionEnd":
             return self.send(dict(event, type="event", machine=self.machine))
         self.read_numbers(agent, session, name, now)
@@ -961,19 +1001,31 @@ class Daemon:
                 self.check_apps(now)
             except Exception:
                 pass
-            if now - self.agents_at >= AGENTS_EVERY:
-                try:
-                    self.agents = agent_states(connect=True, tried=self.tried, previous=self.agents)
-                except Exception:
-                    pass
-                self.agents_at = now
-            if now - last_beat >= HEARTBEAT_EVERY or closed:
+            try:
+                self.refresh_agents(now)
+            except Exception:
+                pass
+            if now - last_beat >= HEARTBEAT_EVERY or closed or self.beat_now:
+                self.beat_now = False
                 self.send(self.heartbeat(alive_keys, now))
                 last_beat = now
             if idle > QUIT_AFTER_IDLE and all(target.outbox.empty() for target in self.targets):
                 self.send(dict(self.heartbeat([], now), bye=True))
                 time.sleep(3)
                 os._exit(0)
+
+    def refresh_agents(self, now):
+        """Which agents have the plugin, every AGENTS_EVERY (giving it to one found since). While Codex waits for its
+        hooks to be trusted, just that, every APPROVAL_EVERY, and the Mac hears at once when it's done."""
+        if now - self.agents_at >= AGENTS_EVERY:
+            self.agents_at = self.approval_at = now
+            self.agents = agent_states(connect=True, tried=self.tried, previous=self.agents)
+        elif (self.agents or {}).get("codex") == "needs_approval" and now - self.approval_at >= APPROVAL_EVERY:
+            self.approval_at = now
+            codex = find_agent("codex")
+            if codex and codex_hooks_waiting(codex) == 0:
+                self.agents = dict(self.agents, codex="connected")
+                self.beat_now = True
 
     def heartbeat(self, sessions, now):
         message = {"type": "heartbeat", "machine": self.machine, "sessions": sessions, "t": now}
@@ -986,8 +1038,9 @@ class Daemon:
         app's own check, AgentHub.checkAgentApps, has the same rules):
         - read: Claude Desktop opened the session after the reply (lastFocusedAt); ChatGPT took the thread off its
           unread list, or never put it there (only threads running inside ChatGPT: a terminal one never is).
-        - question: Claude Desktop's summary of this very reply says it ended on a question for the user (its yellow
-          dot), with what it asks. The summary comes seconds after the reply; looked for up to CLAUDE_SUMMARY_WAIT."""
+        - question: the turn ended on a question for the user (Claude Desktop's yellow dot), with what it asks: in
+          its next-step box (Code-tab sessions, right as the turn ends), else in Claude Desktop's summary of this very
+          reply, which comes seconds after it (looked for up to CLAUDE_SUMMARY_WAIT)."""
         with self.lock:
             waiting = [(key, dict(session)) for key, session in self.sessions.items() if session["finished"] and (
                 not session["read_sent"] or (key.startswith("claude:") and session["summarized"] is None
@@ -1007,10 +1060,17 @@ class Daemon:
                     focused = claude_desktop_last_focused(path)
                     if focused is not None and focused > session["finished"]:
                         read.append(key)
-                if path and session["summarized"] is None and session["transcript"]:
-                    summary = claude_desktop_turn_summary(path)
+                if session["summarized"] is None and session["transcript"]:
+                    box = claude_turn_box(session["transcript"])
+                    summary = claude_desktop_turn_summary(path) if path and not box else None
+                    if box:
+                        change["summarized"] = True
+                        if box[1]:
+                            questions[key] = box[1]
+                    elif not path:
+                        change["summarized"] = True  # neither a box nor Claude Desktop: nothing will say more
                     # Until Claude Desktop sums up this reply, its file still holds the last turn's summary.
-                    if summary and summary[0] == claude_last_reply(session["transcript"]):
+                    elif summary and summary[0] == claude_last_reply(session["transcript"]):
                         change["summarized"] = True
                         if summary[1]:
                             questions[key] = summary[1]
