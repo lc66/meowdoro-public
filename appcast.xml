@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Meowdoro</title>
+    <link>https://github.com/lc66/meowdoro-public</link>
+    <item>
+      <title>Meowdoro 0.1.13</title>
+      <pubDate>Sat, 24 Oct 2026 09:28:55 GMT</pubDate>
+      <sparkle:version>14</sparkle:version>
+      <sparkle:shortVersionString>0.1.13</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li><b>Meowdoro updates itself.</b> Once a day it looks for a newer version. When there is one, the island says so, and Install shows what's new, installs it and restarts Meowdoro. Updates are signed, and Meowdoro installs only ones signed with its own key. Settings → Check for updates automatically turns the daily look off; Check Now, or Check for Updates in the island's right-click menu, looks right away. This version itself needs installing by hand, like before.</li><li><b>A remote machine's helper out of date says so in the island too,</b> not only in Settings: "Helper on devbox is out of date". Later hides it until a newer helper comes out; an update of the app alone doesn't bring it back.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.13/Meowdoro-0.1.13.dmg" type="application/octet-stream" sparkle:edSignature="hO1MNJQmEw16FEXMrXtx68IztgB/Mg02GNnXGmh4X6rZEDme+ke0KnD5R4VVUoWhUPwx/+dvR5nLXZV19ZkGAw==" length="9496366"/>
+    </item>
+  </channel>
+</rss>
