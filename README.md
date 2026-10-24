@@ -16,6 +16,7 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
   ```
 
   The read-me inside the DMG walks through it. Once the app is signed, this step goes away.
+- From 0.1.13 Meowdoro updates itself: once a day it looks for a newer version, says so in the island, and installs it when you press Install. Updates are signed, and Meowdoro installs only ones signed with its own key. Settings has the switch and Check Now; right-click the island for Check for Updates. Versions before 0.1.13 need this one installed by hand.
 - No Dock or menu bar icon: click the island to open it, right-click it for Settings and Quit.
 
 ## What it does
@@ -86,5 +87,7 @@ curl -fsSL https://raw.githubusercontent.com/lc66/meowdoro-public/main/install.s
 Only status: agent, session id, event (working / waiting / finished / error / closed), project name (the git repository's folder name), the session's title, a tool's name when it asks for permission or is an MCP tool, how full the session's context is, Codex's plan limits, whether you've read a finished session there, the question Claude Desktop says a turn ended on (its own one-line summary), which agents have the plugin, the ChatGPT login Codex uses there as a fingerprint (a hash, not the account or the user) and its email masked to the first two letters and the domain (`gl…@gmail.com`; machines with the same login share their limits on your Mac), Claude Code's version when it's too old for it (and that of each session that sends nothing), the machine's name, the helper's version, a timestamp. Never prompts, tool inputs or outputs, file contents, paths or the agent's replies. Everything is encrypted with AES-256-GCM before it leaves; the relay can't read it.
 
 ## Versions
+
+Meowdoro checks `appcast.xml` in this repository for updates (with [Sparkle](https://sparkle-project.org)): it lists the latest version, its notes, and the DMG's EdDSA signature.
 
 The app and the helper have their own versions: app releases are tagged `app-v<version>`, helper releases `helper-v<version>`. A new helper doesn't need a new app, and the other way round. Each message from the helper carries a protocol version. New helpers only add fields, so an older Meowdoro keeps working with a newer helper (it ignores what it doesn't know, and shows agents it doesn't know yet by their name). A change an older Meowdoro couldn't read would raise the protocol version; that Meowdoro then says the machine needs a newer Meowdoro.

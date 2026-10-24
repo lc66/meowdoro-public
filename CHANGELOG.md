@@ -2,6 +2,11 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.13 — 2026-10-24
+
+- **Meowdoro updates itself.** Once a day it looks for a newer version. When there is one, the island says so, and Install shows what's new, installs it and restarts Meowdoro. Updates are signed, and Meowdoro installs only ones signed with its own key. Settings → Check for updates automatically turns the daily look off; Check Now, or Check for Updates in the island's right-click menu, looks right away. This version itself needs installing by hand, like before.
+- **A remote machine's helper out of date says so in the island too,** not only in Settings: "Helper on devbox is out of date". Later hides it until a newer helper comes out; an update of the app alone doesn't bring it back.
+
 ## Meowdoro 0.1.12 — 2026-10-24
 
 - **Sessions that send nothing show up in grey.** Claude Code loads plugins when a session starts, so a session that was already open when you connected it sends nothing. The island now lists those by name, after the others, with what to do: type `/reload-plugins` in it, or restart it. Remote machines' too, with helper 0.6.2 there.
