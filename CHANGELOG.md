@@ -2,6 +2,12 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.14 — 2026-10-24
+
+- Sessions Claude Desktop starts without a project are called "scratch" in the island, not by their folder's long name ("scratch-2026-10-14-9a9a18").
+- A project name longer than 10 characters is cut short ("bot-short…"), so the session's name has room; the full one is in the tooltip.
+- On lines too long for the island, the machine's tag sits in the same place in every row.
+
 ## Meowdoro 0.1.13 — 2026-10-24
 
 - **Meowdoro updates itself.** Once a day it looks for a newer version. When there is one, the island says so, and Install shows what's new, installs it and restarts Meowdoro. Updates are signed, and Meowdoro installs only ones signed with its own key. Settings → Check for updates automatically turns the daily look off; Check Now, or Check for Updates in the island's right-click menu, looks right away. This version itself needs installing by hand, like before.
