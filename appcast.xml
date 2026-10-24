@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.13</title>
-      <pubDate>Sat, 24 Oct 2026 09:28:55 GMT</pubDate>
-      <sparkle:version>14</sparkle:version>
-      <sparkle:shortVersionString>0.1.13</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.14</title>
+      <pubDate>Sat, 24 Oct 2026 09:42:11 GMT</pubDate>
+      <sparkle:version>15</sparkle:version>
+      <sparkle:shortVersionString>0.1.14</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>Meowdoro updates itself.</b> Once a day it looks for a newer version. When there is one, the island says so, and Install shows what's new, installs it and restarts Meowdoro. Updates are signed, and Meowdoro installs only ones signed with its own key. Settings → Check for updates automatically turns the daily look off; Check Now, or Check for Updates in the island's right-click menu, looks right away. This version itself needs installing by hand, like before.</li><li><b>A remote machine's helper out of date says so in the island too,</b> not only in Settings: "Helper on devbox is out of date". Later hides it until a newer helper comes out; an update of the app alone doesn't bring it back.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.13/Meowdoro-0.1.13.dmg" type="application/octet-stream" sparkle:edSignature="hO1MNJQmEw16FEXMrXtx68IztgB/Mg02GNnXGmh4X6rZEDme+ke0KnD5R4VVUoWhUPwx/+dvR5nLXZV19ZkGAw==" length="9496366"/>
+      <description><![CDATA[<ul><li>Sessions Claude Desktop starts without a project are called "scratch" in the island, not by their folder's long name ("scratch-2026-10-14-9a9a18").</li><li>A project name longer than 10 characters is cut short ("bot-short…"), so the session's name has room; the full one is in the tooltip.</li><li>On lines too long for the island, the machine's tag sits in the same place in every row.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.14/Meowdoro-0.1.14.dmg" type="application/octet-stream" sparkle:edSignature="Wj7CAa4J38aFnz3GB3s8nbny2iYB7O+eEsMw4vX3WCDc5n2DT1jbQylIi+N4iamtbk1hPY5ljMudxyK4cbpVBw==" length="9503000"/>
     </item>
   </channel>
 </rss>
