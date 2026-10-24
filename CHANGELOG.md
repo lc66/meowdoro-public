@@ -2,6 +2,24 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.12 — 2026-10-24
+
+- **Sessions that send nothing show up in grey.** Claude Code loads plugins when a session starts, so a session that was already open when you connected it sends nothing. The island now lists those by name, after the others, with what to do: type `/reload-plugins` in it, or restart it. Remote machines' too, with helper 0.6.2 there.
+- **Codex is grouped by account.** This Mac and the machines where Codex is signed in to the same ChatGPT account share one group, with that account's limits; another account gets a group of its own, with its limits. With more than one, each says whose it is by the login's email, masked: `gl…@gmail.com`. Claude stays one group. Remote machines need helper 0.6.2.
+- **Claude Code too old for the plugin says so.** Claude Code before 2.1.89 skips all of Meowdoro's hooks without a word. Its tile in Settings now says "Update needed", and so does the island. Connect installs the plugin anyway, so once you update, new sessions show up by themselves.
+- **One line per session.** The session's name sits where its status was, unless the agent needs something (a question, a permission, an error): then that. The dot's color tells working from finished; the tooltip says it in words. Settings → Agents → One line per session turns the two-line rows back on.
+- **Plan limits as one small pie** by the fullest window, orange from 80% or when it would run out before its reset, with "→ out 13:27" beside it then. Every window is in the tooltip.
+- **New pictures beside the notch:** the cat behind its laptop, and an orange mug on a break. Settings → Timer → Icons brings back the old ones (v1).
+- The "Welcome back" card after an auto-pause waits until you've unlocked the Mac. Waking from sleep, it could show under the lock screen and be gone by the time you were in; so could the card for a phase that ended while you were away.
+- A session stays in the island through /compact. Claude Code starts the session again after compacting, and Meowdoro took that for a new session with nothing to show: it vanished until your next message, or, compacting by itself mid-turn, until its next step.
+
+## Helper 0.6.2 — 2026-10-24
+
+- Claude Code sessions that were open before the plugin are named at setup, and your Mac lists them in grey until you type `/reload-plugins` in them or restart them. Needs Meowdoro 0.1.12; an older one ignores them.
+- The plugin goes into Claude Code of any version with plugins (before, only 2.1.292 or newer). Claude Code before 2.1.89 can't run its hooks: setup says so, and your Mac shows "Update needed". After the update, new sessions show up by themselves; no need to run the line again.
+- Tells your Mac which ChatGPT account Codex uses here: a fingerprint (a hash) and the email masked to its first two letters and domain (`gl…@gmail.com`); the full address never leaves. Machines on the same account share a group and its limits there.
+- After /compact, a reply you read on this machine still shows as read on your Mac, and a question it ended on still shows as waiting. The helper forgot the finished reply when Claude Code started the session again after compacting.
+
 ## Meowdoro 0.1.11 — 2026-10-23
 
 - A question in Claude Desktop's next-step box (the Code tab's sessions) shows as waiting too: those sessions get no turn summary, which is all 0.1.10 looked at. On remote machines this needs helper 0.6.1.

@@ -73,15 +73,17 @@ curl -fsSL https://raw.githubusercontent.com/lc66/meowdoro-public/main/install.s
 - `install.sh` downloads the helper of its own release by tag and runs it only if its SHA-256 matches.
 - `<code>` carries the channel and the encryption key made on your Mac; it is saved to `~/.meowdoro/remote.json` (owner-only).
 - It finds Claude Code and Codex on PATH, in the usual install folders, and on a Mac inside Claude Desktop and ChatGPT too. Right after setup your Mac lists the machine in Settings → Remote agents.
-- The helper's plugin, `meowdoro-remote`, is installed into Claude Code and Codex with their own commands. Running sessions pick it up after a restart; Codex runs plugin hooks only after you trust them (`/hooks`), and your Mac says so until you do. An agent installed there later gets the plugin by itself; one you switch off stays off.
-- Settings → Remote agents shows each machine's agents: connected, waiting for Codex's hooks to be trusted, or not there.
+- The helper's plugin, `meowdoro-remote`, is installed into Claude Code and Codex with their own commands. Codex runs plugin hooks only after you trust them (`/hooks`), and your Mac says so until you do. An agent installed there later gets the plugin by itself; one you switch off stays off.
+- Agents load plugins when a session starts. Claude Code sessions that were already open send nothing until you type `/reload-plugins` in them or restart them: setup names them, and your Mac lists them in grey with that hint until they do. Codex sessions that were open pick it up after a restart.
+- Claude Code needs 2.1.89 or newer for the plugin's hooks. An older one gets the plugin anyway, and your Mac says to update it; sessions started after the update show up by themselves, no need to run the line again.
+- Settings → Remote agents shows each machine's agents: connected, waiting for Codex's hooks to be trusted, too old, or not there.
 - On a machine that runs Meowdoro too (a Mac VM, say), its own plugin and the helper's work side by side: the agents there show up in that machine's island and on your Mac.
 - Several Macs can watch the same machine: run each Mac's line there. The helper sends to all of them (up to 8), each sealed with its own key. `python3 ~/.meowdoro/bin/meowdoro-remote list` shows them, `… remove <number>` stops one.
 - Update: run the line again (Settings says when a newer helper is out; it never updates itself). Remove: `python3 ~/.meowdoro/bin/meowdoro-remote uninstall`.
 
 ### What leaves that machine
 
-Only status: agent, session id, event (working / waiting / finished / error / closed), project name (the git repository's folder name), the session's title, a tool's name when it asks for permission or is an MCP tool, how full the session's context is, Codex's plan limits, whether you've read a finished session there, the question Claude Desktop says a turn ended on (its own one-line summary), which agents have the plugin, the machine's name, the helper's version, a timestamp. Never prompts, tool inputs or outputs, file contents, paths or the agent's replies. Everything is encrypted with AES-256-GCM before it leaves; the relay can't read it.
+Only status: agent, session id, event (working / waiting / finished / error / closed), project name (the git repository's folder name), the session's title, a tool's name when it asks for permission or is an MCP tool, how full the session's context is, Codex's plan limits, whether you've read a finished session there, the question Claude Desktop says a turn ended on (its own one-line summary), which agents have the plugin, the ChatGPT login Codex uses there as a fingerprint (a hash, not the account or the user) and its email masked to the first two letters and the domain (`gl…@gmail.com`; machines with the same login share their limits on your Mac), Claude Code's version when it's too old for it (and that of each session that sends nothing), the machine's name, the helper's version, a timestamp. Never prompts, tool inputs or outputs, file contents, paths or the agent's replies. Everything is encrypted with AES-256-GCM before it leaves; the relay can't read it.
 
 ## Versions
 

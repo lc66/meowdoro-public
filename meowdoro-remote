@@ -18,13 +18,15 @@
           `uninstall` removes everything. A Meowdoro running on this machine too keeps its own plugin, meowdoro:
           each hook goes to both.
 
-Python 3.8+, standard library only. Files: ~/.meowdoro/ (remote.json, remote.sock, remote.lock, remote.log, agent-plugins/).
+Python 3.8+, standard library only. Files: ~/.meowdoro/ (remote.json, remote.sock, remote.lock, remote.log, heard.json,
+agent-plugins/).
 """
 
 import base64
 import calendar
 import fcntl
 import fnmatch
+import hashlib
 import json
 import math
 import os
@@ -47,13 +49,15 @@ HOME = os.path.expanduser("~/.meowdoro")
 CONFIG = os.path.join(HOME, "remote.json")
 LOCK = os.path.join(HOME, "remote.lock")
 LOG = os.path.join(HOME, "remote.log")
+# Claude Code sessions here that have sent an event, while they're open: never listed as sending nothing.
+HEARD = os.path.join(HOME, "heard.json")
 PLUGINS = os.path.join(HOME, "agent-plugins")
 # The plugin and its marketplace. Agents allow one marketplace per name, and `meowdoro` is the Mac app's own.
 PLUGIN = "meowdoro-remote"
 PLUGIN_ID = f"{PLUGIN}@{PLUGIN}"
 # Helpers before 0.5.0 installed theirs from PLUGINS under the app's name; setup and uninstall take that one away.
 OLD_PLUGIN = "meowdoro"
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 # What the Mac decodes. Changes to the messages only ever add fields; a change old Meowdoros can't read bumps this,
 # and they then say "needs a newer Meowdoro" for this machine instead of guessing.
 PROTOCOL = 1
@@ -763,6 +767,166 @@ def agent_states(connect=False, tried=None, previous=None):
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# Sessions that send nothing. Claude Code loads plugins when a session starts, so one open since before the plugin
+# was installed has none until /reload-plugins or a restart; a Claude Code older than CLAUDE_MINIMUM skips all of the
+# plugin's hooks over the one it doesn't know. The Mac lists them in grey with what to do (the same rules as
+# ClaudeSessions.swift there). Codex keeps no notes on its sessions to find them by.
+
+# PermissionDenied, one of the plugin's hooks, came in Claude Code 2.1.89.
+CLAUDE_MINIMUM = "2.1.89"
+UNHEARD_MAX = 20
+
+
+def _version(text):
+    parts = []
+    for part in str(text).split(" ")[0].split("."):
+        digits = re.match(r"\d+", part)
+        if not digits:
+            break
+        parts.append(int(digits.group()))
+    return tuple(parts)
+
+
+def claude_too_old(version):
+    """True for a version older than CLAUDE_MINIMUM: "2.1.85", or "2.1.85 (Claude Code)" as `claude --version` says
+    it. An unknown version isn't."""
+    return isinstance(version, str) and version[:1].isdigit() and _version(version) < _version(CLAUDE_MINIMUM)
+
+
+def claude_version(tool):
+    try:
+        words = subprocess.run([tool, "--version"], capture_output=True, text=True, timeout=15).stdout.split()
+    except Exception:
+        return None
+    return words[0] if words and words[0][:1].isdigit() else None
+
+
+def outdated_agents():
+    """{"claude": "2.1.85"} when Claude Code here has the plugin but is too old to run its hooks."""
+    if plugin_state("claude") != "on":
+        return {}
+    tool = find_agent("claude")
+    version = claude_version(tool) if tool else None
+    return {"claude": version} if claude_too_old(version) else {}
+
+
+def mask_email(email):
+    """The first two letters before "@" (one when there are three or fewer), an ellipsis and the domain:
+    "gleb.zykov@gmail.com" -> "gl…@gmail.com". Only this leaves the machine."""
+    parts = str(email).strip().lower().split("@")
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        return None
+    return parts[0][:2 if len(parts[0]) > 3 else 1] + "…@" + parts[1]
+
+
+def codex_account():
+    """The ChatGPT login Codex uses here: {"id": fingerprint, "label": masked email}. The fingerprint is 16 hex
+    digits of SHA-256("<account>:<user>") from its auth.json (`tokens.account_id`, and the ChatGPT user in its
+    id_token). Plan limits are per user in an account, so the Mac gives machines with the same fingerprint one group
+    and one line of limits, and tells the groups apart by the label (CodexAccount.swift there; the tests check both
+    give the same). None with an API key, or when it can't tell."""
+    try:
+        with open(os.path.join(codex_config_dir(), "auth.json")) as f:
+            tokens = json.load(f).get("tokens") or {}
+        account = tokens.get("account_id")
+        if not isinstance(account, str) or not account:
+            return None
+        claims = {}
+        parts = (tokens.get("id_token") or "").split(".")
+        if len(parts) == 3:
+            claims = json.loads(unb64u(parts[1]))
+        auth = claims.get("https://api.openai.com/auth") or {}
+        user = auth.get("chatgpt_user_id") or auth.get("user_id") or claims.get("sub") or ""
+        login = {"id": hashlib.sha256(f"{account}:{user}".encode()).hexdigest()[:16]}
+        label = mask_email(claims["email"]) if isinstance(claims.get("email"), str) else None
+        if label:
+            login["label"] = label
+        return login
+    except Exception:
+        return None
+
+
+def plugin_installed_at():
+    """When Claude Code installed this helper's plugin (plugins/installed_plugins.json), as epoch seconds."""
+    try:
+        with open(os.path.join(claude_config_dir(), "plugins", "installed_plugins.json")) as f:
+            installs = (json.load(f).get("plugins") or {}).get(PLUGIN_ID) or []
+        return _timestamp(installs[0].get("installedAt"))
+    except Exception:
+        return None
+
+
+def open_claude_sessions():
+    """The sessions Claude Code runs here, from the note it keeps on each (<config>/sessions/<pid>.json, terminal
+    and Claude Desktop alike), with `started` in epoch seconds."""
+    folder = os.path.join(claude_config_dir(), "sessions")
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return []
+    found = []
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(folder, name)) as f:
+                note = json.load(f)
+            pid, session_id, started = int(note["pid"]), note["sessionId"], float(note["startedAt"]) / 1000
+        except Exception:
+            continue
+        # A note left by a session that crashed, or its pid taken by something else since.
+        if not isinstance(session_id, str) or not session_id or not alive(pid):
+            continue
+        program = os.path.basename(_process(pid)[0] or "")
+        if "claude" not in program.lower() and program != "node":
+            continue
+        found.append(dict(note, pid=pid, sessionId=session_id, started=started))
+    return found
+
+
+def unheard_sessions(heard):
+    """(open, unheard): "claude:<id>" of every open Claude Code session, and the ones that send nothing although the
+    plugin is on — started before it was installed, or on too old a Claude Code — unless heard from, as the Mac
+    lists them."""
+    if plugin_state("claude") != "on":
+        return set(), []
+    installed = plugin_installed_at()
+    open_keys, unheard = set(), []
+    for note in sorted(open_claude_sessions(), key=lambda note: note["started"]):
+        key = f"claude:{note['sessionId']}"
+        open_keys.add(key)
+        version = note.get("version") if isinstance(note.get("version"), str) else None
+        if key in heard or not (claude_too_old(version) or (installed is not None and note["started"] < installed)):
+            continue
+        item = {"agent": "claude", "session_id": note["sessionId"], "project": project_name(note.get("cwd")), "started": note["started"]}
+        if isinstance(note.get("name"), str) and note["name"].strip():
+            item["title"] = note["name"].strip()[:200]
+        if version:
+            item["version"] = version[:40]
+        unheard.append(item)
+    return open_keys, unheard[:UNHEARD_MAX]
+
+
+def load_heard():
+    try:
+        with open(HEARD) as f:
+            return {key for key in json.load(f) if isinstance(key, str)}
+    except Exception:
+        return set()
+
+
+def save_heard(heard):
+    try:
+        os.makedirs(HOME, mode=0o700, exist_ok=True)
+        temporary = HEARD + ".tmp"
+        with open(temporary, "w") as f:
+            json.dump(sorted(heard), f)
+        os.replace(temporary, HEARD)
+    except OSError:
+        pass
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # hook
 
 def socket_path():
@@ -908,6 +1072,13 @@ class Daemon:
         self.approval_at = 0
         self.beat_now = False
         self.chatgpt = None
+        # Claude Code sessions heard from (kept in HEARD), the open ones that send nothing, and agents too old for
+        # the plugin: told to the Mac with every heartbeat.
+        self.heard = load_heard()
+        self.unheard = []
+        self.outdated = None
+        # The ChatGPT login Codex uses here (`codex_account`), looked at with the agents.
+        self.accounts = None
 
     def process(self):
         """One event at a time, in the order the hooks ran: a slow read must not let "working" overtake "finished"."""
@@ -925,6 +1096,13 @@ class Daemon:
         now = time.time()
         with self.lock:
             self.idle_since = now
+            if agent == "claude" and key not in self.heard:
+                self.heard.add(key)
+                save_heard(self.heard)
+                self.unheard = [item for item in self.unheard if f"claude:{item['session_id']}" != key]
+            # A session this daemon already knows starting again (Claude Code after /compact, a resumed session)
+            # carries on as it was, like on the Mac: its finished reply is still the one to watch for "read".
+            carries_on = name == "SessionStart" and key in self.sessions
             if name == "SessionEnd":
                 self.sessions.pop(key, None)
             else:
@@ -949,12 +1127,13 @@ class Daemon:
             app = event.get("mcp_server") or (event.get("tool_name", "").split("__")[1] if event.get("tool_name", "").startswith("mcp__") else None)
             if name == "PostToolUse" and session["kind"] == "working" and now - session["sent"] < WORKING_RESEND and app == session["app"] and not news:
                 return
-            session["kind"] = "working" if name in WORKING else name
-            if name in FINISHED:
-                # When the reply came, by this machine's clock, like the apps' notes on reading it.
-                session.update(finished=event.get("t", now), read_sent=False, saw_unread=False, summarized=None)
-            else:
-                session["finished"] = None
+            if not carries_on:
+                session["kind"] = "working" if name in WORKING else name
+                if name in FINISHED:
+                    # When the reply came, by this machine's clock, like the apps' notes on reading it.
+                    session.update(finished=event.get("t", now), read_sent=False, saw_unread=False, summarized=None)
+                else:
+                    session["finished"] = None
             session["sent"] = now
             session["app"] = app or session["app"]
             session["shown"] = _shown(numbers)
@@ -984,13 +1163,19 @@ class Daemon:
             time.sleep(LIVENESS_EVERY)
             now = time.time()
             closed = []
+            if now - last_beat >= HEARTBEAT_EVERY:
+                try:
+                    self.refresh_unheard()
+                except Exception:
+                    pass
             with self.lock:
                 for key, session in list(self.sessions.items()):
                     if session["pid"] and not alive(session["pid"]):
                         closed.append(key)
                         del self.sessions[key]
                 alive_keys = list(self.sessions)
-                if self.sessions:
+                # Sessions that send nothing keep it up too: the Mac lists them until they speak or close.
+                if self.sessions or self.unheard:
                     self.idle_since = now
                 idle = now - self.idle_since
             for key in closed:
@@ -1014,12 +1199,33 @@ class Daemon:
                 time.sleep(3)
                 os._exit(0)
 
+    def refresh_unheard(self):
+        """Claude Code sessions here that send nothing (`unheard_sessions`), looked up for each heartbeat; the ones
+        heard from that closed since are forgotten."""
+        with self.lock:
+            heard = set(self.heard)
+        open_keys, unheard = unheard_sessions(heard)
+        with self.lock:
+            still_open = self.heard & open_keys
+            if still_open != self.heard:
+                self.heard = still_open
+                save_heard(self.heard)
+            # An event may have come meanwhile.
+            unheard = [item for item in unheard if f"claude:{item['session_id']}" not in self.heard]
+            if unheard != self.unheard:
+                self.unheard = unheard
+                self.beat_now = True
+
     def refresh_agents(self, now):
-        """Which agents have the plugin, every AGENTS_EVERY (giving it to one found since). While Codex waits for its
-        hooks to be trusted, just that, every APPROVAL_EVERY, and the Mac hears at once when it's done."""
+        """Which agents have the plugin, every AGENTS_EVERY (giving it to one found since), and which are too old for
+        it. While Codex waits for its hooks to be trusted, just that, every APPROVAL_EVERY, and the Mac hears at once
+        when it's done."""
         if now - self.agents_at >= AGENTS_EVERY:
             self.agents_at = self.approval_at = now
             self.agents = agent_states(connect=True, tried=self.tried, previous=self.agents)
+            self.outdated = outdated_agents()
+            account = codex_account()
+            self.accounts = {"codex": account} if account else {}
         elif (self.agents or {}).get("codex") == "needs_approval" and now - self.approval_at >= APPROVAL_EVERY:
             self.approval_at = now
             codex = find_agent("codex")
@@ -1028,9 +1234,13 @@ class Daemon:
                 self.beat_now = True
 
     def heartbeat(self, sessions, now):
-        message = {"type": "heartbeat", "machine": self.machine, "sessions": sessions, "t": now}
+        message = {"type": "heartbeat", "machine": self.machine, "sessions": sessions, "t": now, "unheard": self.unheard}
         if self.agents:
             message["agents"] = self.agents
+        if self.outdated is not None:
+            message["outdated"] = self.outdated
+        if self.accounts is not None:
+            message["accounts"] = self.accounts
         return message
 
     def check_apps(self, now, home=None, codex_home=None):
@@ -1332,11 +1542,28 @@ def setup(relay, code, name=None):
             print(f"  {agent}: {'plugin installed' if ok else 'install failed — see the commands in Meowdoro'}{_whose(tool)}{note}")
         else:
             print(f"  {agent}: not found on this machine (looked on PATH, in the usual install folders and desktop apps)")
+    outdated = outdated_agents()
+    unheard = unheard_sessions(load_heard())[1]
     if status is not None and 200 <= status < 300:
-        # Which agents have the plugin now: their tiles under this machine in the Mac's Settings.
-        target.deliver({"type": "heartbeat", "machine": config["name"], "sessions": [], "agents": agent_states(), "t": time.time()}, timeout=8)
-    print("Agent sessions that are already running pick it up after a restart.")
-    print("Codex runs plugin hooks only after you trust them: /hooks in the Codex CLI.")
+        # Which agents have the plugin now: their tiles under this machine in the Mac's Settings; and the sessions
+        # here that send nothing, its grey rows.
+        account = codex_account()
+        target.deliver({"type": "heartbeat", "machine": config["name"], "sessions": [], "agents": agent_states(),
+                        "unheard": unheard, "outdated": outdated, "accounts": {"codex": account} if account else {},
+                        "t": time.time()}, timeout=8)
+    if outdated.get("claude"):
+        print(f"  claude {outdated['claude']} is too old for the plugin: update it to {CLAUDE_MINIMUM} or newer."
+              " Sessions started after that show up by themselves.")
+    if unheard:
+        print("  Claude Code sessions here that send nothing yet (Claude Code loads plugins when a session starts):")
+        for item in unheard:
+            fix = "update Claude Code, then restart it" if claude_too_old(item.get("version")) else "type /reload-plugins in it, or restart it"
+            print(f"    {item.get('title') or 'untitled'} · {item['project']}: {fix}")
+        # Keeps the Mac's list of them up to date until they speak or close.
+        _start_daemon()
+    if dict(tools).get("codex"):
+        print("Codex sessions that are already running pick it up after a restart; Codex runs plugin hooks only after")
+        print("you trust them: /hooks in the Codex CLI.")
 
 
 def stop_daemon():
@@ -1399,7 +1626,11 @@ def write_plugin(script):
 
 
 def install_claude(tool):
-    return run([tool, "plugin", "install", PLUGIN, "--marketplace", PLUGINS, "--scope", "user"])
+    # The two steps every version with plugins knows (`install --marketplace` came only in 2.1.292): a Claude Code
+    # too old for the hooks still gets the plugin, and its update alone makes them work. Adding a marketplace that
+    # is already there fails harmlessly; the install is what counts.
+    run([tool, "plugin", "marketplace", "add", PLUGINS])
+    return run([tool, "plugin", "install", PLUGIN_ID, "--scope", "user"])
 
 
 def install_codex(tool):
@@ -1518,7 +1749,7 @@ def uninstall():
             remove_old_plugin(agent, tool)
             run([tool] + args)
             run([tool, "plugin", "marketplace", "remove", PLUGIN])
-    for path in (socket_path(), LOCK):
+    for path in (socket_path(), LOCK, HEARD):
         try:
             os.unlink(path)
         except FileNotFoundError:
