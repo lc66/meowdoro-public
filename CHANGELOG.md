@@ -2,6 +2,13 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.16 — 2026-10-25
+
+- **Round dots add up.** The dots now count toward the long break. Rounds you've done are filled. The current one is a ring while its focus runs and fills in during its break. The rest stay grey.
+- **Overtime keeps the picture of the phase you're sitting over.** Say a break runs out while the Mac sleeps and the focus waits for Start: the mug stays beside the notch while +3:12 counts, not the cat at its laptop. VoiceOver says the same. ▶ still starts the next phase.
+- **A shorter right-click menu:** Statistics and Settings, About and Check for Updates, Quit. Start Over from Round 1 and Show Agents During Focus are gone: ⏮ and the agents switch are one click away in the island.
+- Meowdoro never edits your agents' settings: its plugin is installed, updated and removed only with Claude Code's and Codex's own commands. Connect no longer cleans up hooks that test builds before 0.1.6 wrote into `~/.claude/settings.json` or `~/.codex/hooks.json`; if you ran one of those, delete the lines that call `meowdoro-hook` there, or each event shows up twice.
+
 ## Meowdoro 0.1.15 — 2026-10-25
 
 - **A simpler card when a phase ends.** The cat shows what happened. One wide button says what's next and for how long: "▶ Break 05:00", "▶ Resume 12:14". Under it there's a line only when there's something to say: your agents as colored dots with counts, or the sessions to /compact. The button stands in the same place on every card.
