@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.15</title>
-      <pubDate>Sun, 25 Oct 2026 09:10:32 GMT</pubDate>
-      <sparkle:version>16</sparkle:version>
-      <sparkle:shortVersionString>0.1.15</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.16</title>
+      <pubDate>Sun, 25 Oct 2026 12:57:45 GMT</pubDate>
+      <sparkle:version>17</sparkle:version>
+      <sparkle:shortVersionString>0.1.16</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>A simpler card when a phase ends.</b> The cat shows what happened. One wide button says what's next and for how long: "▶ Break 05:00", "▶ Resume 12:14". Under it there's a line only when there's something to say: your agents as colored dots with counts, or the sessions to /compact. The button stands in the same place on every card.</li><li><b>A tidier timer row.</b> ⏮ ⏭ ↺ share one plate. Statistics and settings are grey icons that light up under the pointer. The row is shorter, so a named focus shows twice as much of its name.</li><li><b>Resume, not Start,</b> wherever a paused focus goes on: the time carries on from where it stopped.</li><li><b>Settings, regrouped.</b> How the notch looks has its own section, In the notch, and what the island shows of your agents is apart from connecting them. Every number sits on the right, beside its stepper; minutes no longer have a slider that repeated the stepper.</li><li><b>VoiceOver reads the island:</b> the icon buttons, the mini cat (it says the phase), the time however it's drawn, the badge, and each agent row, with the status its dot shows only in color.</li><li>Sessions that send nothing are dimmed like read ones, so the agents that really wait stand out.</li><li>Statistics: the chart has a title, and breaks in the journal are quieter.</li><li>The icon sets are called Cat and Laptop &amp; Mug instead of v1 and v2.</li><li>The island folds up as soon as its spring settles, not after a fixed delay.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.15/Meowdoro-0.1.15.dmg" type="application/octet-stream" sparkle:edSignature="ydD4he7uTOsw0X4ryhnu60MBRAQlmWT6ufaFxFWYu4OKSzWidsi8OGtnKWj4pjl2QWLLrkv0wCvApFNSCd/9DQ==" length="9617215"/>
+      <description><![CDATA[<ul><li><b>Round dots add up.</b> The dots now count toward the long break. Rounds you've done are filled. The current one is a ring while its focus runs and fills in during its break. The rest stay grey.</li><li><b>Overtime keeps the picture of the phase you're sitting over.</b> Say a break runs out while the Mac sleeps and the focus waits for Start: the mug stays beside the notch while +3:12 counts, not the cat at its laptop. VoiceOver says the same. ▶ still starts the next phase.</li><li><b>A shorter right-click menu:</b> Statistics and Settings, About and Check for Updates, Quit. Start Over from Round 1 and Show Agents During Focus are gone: ⏮ and the agents switch are one click away in the island.</li><li>Meowdoro never edits your agents' settings: its plugin is installed, updated and removed only with Claude Code's and Codex's own commands. Connect no longer cleans up hooks that test builds before 0.1.6 wrote into <code>~/.claude/settings.json</code> or <code>~/.codex/hooks.json</code>; if you ran one of those, delete the lines that call <code>meowdoro-hook</code> there, or each event shows up twice.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.16/Meowdoro-0.1.16.dmg" type="application/octet-stream" sparkle:edSignature="JOV6r6TuDNOZj6ri3DUDpHAGSBjm3i7zMOOt9d3z9X6lVDgT2DkKzxLPPkQ5JIcaDUz0lUziBYc1KC3LIQsmBA==" length="9589161"/>
     </item>
   </channel>
 </rss>
