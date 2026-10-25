@@ -2,6 +2,18 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.15 — 2026-10-25
+
+- **A simpler card when a phase ends.** The cat shows what happened. One wide button says what's next and for how long: "▶ Break 05:00", "▶ Resume 12:14". Under it there's a line only when there's something to say: your agents as colored dots with counts, or the sessions to /compact. The button stands in the same place on every card.
+- **A tidier timer row.** ⏮ ⏭ ↺ share one plate. Statistics and settings are grey icons that light up under the pointer. The row is shorter, so a named focus shows twice as much of its name.
+- **Resume, not Start,** wherever a paused focus goes on: the time carries on from where it stopped.
+- **Settings, regrouped.** How the notch looks has its own section, In the notch, and what the island shows of your agents is apart from connecting them. Every number sits on the right, beside its stepper; minutes no longer have a slider that repeated the stepper.
+- **VoiceOver reads the island:** the icon buttons, the mini cat (it says the phase), the time however it's drawn, the badge, and each agent row, with the status its dot shows only in color.
+- Sessions that send nothing are dimmed like read ones, so the agents that really wait stand out.
+- Statistics: the chart has a title, and breaks in the journal are quieter.
+- The icon sets are called Cat and Laptop & Mug instead of v1 and v2.
+- The island folds up as soon as its spring settles, not after a fixed delay.
+
 ## Meowdoro 0.1.14 — 2026-10-24
 
 - Sessions Claude Desktop starts without a project are called "scratch" in the island, not by their folder's long name ("scratch-2026-10-14-9a9a18").

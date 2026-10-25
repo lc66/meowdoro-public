@@ -28,7 +28,7 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
 - The time in the notch as digits, a ring or a bar, counting down or up. It flashes when a minute is left.
 - After a phase ends the time keeps counting up (+3:12) until you start the next one, or the next phase starts on its own. After 4 hours with nothing running (a night away), the timer starts over from the first round.
 - Click "Focus" in the island to name what you're working on.
-- If you want, a focus pauses after 5 minutes without keyboard or mouse, or during a call (camera or microphone in use), with the time rewound to when it began; the island says so, and offers Start once you're back. Both are off by default.
+- If you want, a focus pauses after 5 minutes without keyboard or mouse, or during a call (camera or microphone in use), with the time rewound to when it began; the island says so, and offers Resume once you're back. Both are off by default.
 - A purr, a beep or nothing when a phase ends, at its own volume.
 - Do Not Disturb during focus, through two Shortcuts (only Shortcuts can switch a Focus on macOS). "Add Do Not Disturb shortcuts" in Settings adds Meowdoro's own in two clicks.
 - On the screen with the notch or on the main display; it can hide over full-screen apps.
