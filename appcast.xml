@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.14</title>
-      <pubDate>Sat, 24 Oct 2026 09:42:11 GMT</pubDate>
-      <sparkle:version>15</sparkle:version>
-      <sparkle:shortVersionString>0.1.14</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.15</title>
+      <pubDate>Sun, 25 Oct 2026 09:10:32 GMT</pubDate>
+      <sparkle:version>16</sparkle:version>
+      <sparkle:shortVersionString>0.1.15</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li>Sessions Claude Desktop starts without a project are called "scratch" in the island, not by their folder's long name ("scratch-2026-10-14-9a9a18").</li><li>A project name longer than 10 characters is cut short ("bot-short…"), so the session's name has room; the full one is in the tooltip.</li><li>On lines too long for the island, the machine's tag sits in the same place in every row.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.14/Meowdoro-0.1.14.dmg" type="application/octet-stream" sparkle:edSignature="Wj7CAa4J38aFnz3GB3s8nbny2iYB7O+eEsMw4vX3WCDc5n2DT1jbQylIi+N4iamtbk1hPY5ljMudxyK4cbpVBw==" length="9503000"/>
+      <description><![CDATA[<ul><li><b>A simpler card when a phase ends.</b> The cat shows what happened. One wide button says what's next and for how long: "▶ Break 05:00", "▶ Resume 12:14". Under it there's a line only when there's something to say: your agents as colored dots with counts, or the sessions to /compact. The button stands in the same place on every card.</li><li><b>A tidier timer row.</b> ⏮ ⏭ ↺ share one plate. Statistics and settings are grey icons that light up under the pointer. The row is shorter, so a named focus shows twice as much of its name.</li><li><b>Resume, not Start,</b> wherever a paused focus goes on: the time carries on from where it stopped.</li><li><b>Settings, regrouped.</b> How the notch looks has its own section, In the notch, and what the island shows of your agents is apart from connecting them. Every number sits on the right, beside its stepper; minutes no longer have a slider that repeated the stepper.</li><li><b>VoiceOver reads the island:</b> the icon buttons, the mini cat (it says the phase), the time however it's drawn, the badge, and each agent row, with the status its dot shows only in color.</li><li>Sessions that send nothing are dimmed like read ones, so the agents that really wait stand out.</li><li>Statistics: the chart has a title, and breaks in the journal are quieter.</li><li>The icon sets are called Cat and Laptop &amp; Mug instead of v1 and v2.</li><li>The island folds up as soon as its spring settles, not after a fixed delay.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.15/Meowdoro-0.1.15.dmg" type="application/octet-stream" sparkle:edSignature="ydD4he7uTOsw0X4ryhnu60MBRAQlmWT6ufaFxFWYu4OKSzWidsi8OGtnKWj4pjl2QWLLrkv0wCvApFNSCd/9DQ==" length="9617215"/>
     </item>
   </channel>
 </rss>
