@@ -2,6 +2,14 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.17 — 2026-10-26
+
+- **A welcome tour, right in the island.** Where Meowdoro is new, the island opens a one-minute tour: where it lives, the timer played in seconds, your agents with a demo row and Connect for the ones on this Mac, the timer row's buttons, and your first focus. Already using Meowdoro? It won't open by itself: right-click the island → Welcome Tour…, or Settings → General.
+- **Hints the first time something happens:** what the amber overtime counts, that a waiting agent's line opens its session, and what a grey session needs.
+- **Agent rows say when it's time for /compact.** Past the threshold in Settings, the row says "Context 64% · time for /compact" in orange, on one-line and two-line rows alike.
+- The context ring's tooltip is back on one-line rows, and the minutes on each row say what they count: "Waiting for you for 6 min", "Finished 12 min ago".
+- About Meowdoro comes first in the right-click menu, with Welcome Tour… under it.
+
 ## Meowdoro 0.1.16 — 2026-10-25
 
 - **Round dots add up.** The dots now count toward the long break. Rounds you've done are filled. The current one is a ring while its focus runs and fills in during its break. The rest stay grey.

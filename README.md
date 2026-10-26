@@ -6,7 +6,7 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
 
 ## Download
 
-**[The latest Meowdoro](https://github.com/lc66/meowdoro-public/releases/latest)**: `Meowdoro-<version>.dmg` under Assets. What changed in each version: [CHANGELOG.md](CHANGELOG.md); older versions: [Releases](https://github.com/lc66/meowdoro-public/releases).
+**[Download the latest Meowdoro](https://github.com/lc66/meowdoro-public/releases/latest/download/Meowdoro.dmg)** (a DMG). What changed in each version: [CHANGELOG.md](CHANGELOG.md); older versions and their notes: [Releases](https://github.com/lc66/meowdoro-public/releases).
 
 - macOS 14 or later, Apple silicon or Intel. On a Mac without a notch it's a small bar in the middle of the top edge.
 - This test version isn't signed by Apple yet, so macOS refuses the first launch. Drag Meowdoro to Applications, then run this once in Terminal:
