@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.16</title>
-      <pubDate>Sun, 25 Oct 2026 12:57:45 GMT</pubDate>
-      <sparkle:version>17</sparkle:version>
-      <sparkle:shortVersionString>0.1.16</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.17</title>
+      <pubDate>Mon, 26 Oct 2026 15:28:31 GMT</pubDate>
+      <sparkle:version>18</sparkle:version>
+      <sparkle:shortVersionString>0.1.17</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>Round dots add up.</b> The dots now count toward the long break. Rounds you've done are filled. The current one is a ring while its focus runs and fills in during its break. The rest stay grey.</li><li><b>Overtime keeps the picture of the phase you're sitting over.</b> Say a break runs out while the Mac sleeps and the focus waits for Start: the mug stays beside the notch while +3:12 counts, not the cat at its laptop. VoiceOver says the same. ▶ still starts the next phase.</li><li><b>A shorter right-click menu:</b> Statistics and Settings, About and Check for Updates, Quit. Start Over from Round 1 and Show Agents During Focus are gone: ⏮ and the agents switch are one click away in the island.</li><li>Meowdoro never edits your agents' settings: its plugin is installed, updated and removed only with Claude Code's and Codex's own commands. Connect no longer cleans up hooks that test builds before 0.1.6 wrote into <code>~/.claude/settings.json</code> or <code>~/.codex/hooks.json</code>; if you ran one of those, delete the lines that call <code>meowdoro-hook</code> there, or each event shows up twice.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.16/Meowdoro-0.1.16.dmg" type="application/octet-stream" sparkle:edSignature="JOV6r6TuDNOZj6ri3DUDpHAGSBjm3i7zMOOt9d3z9X6lVDgT2DkKzxLPPkQ5JIcaDUz0lUziBYc1KC3LIQsmBA==" length="9589161"/>
+      <description><![CDATA[<ul><li><b>A welcome tour, right in the island.</b> Where Meowdoro is new, the island opens a one-minute tour: where it lives, the timer played in seconds, your agents with a demo row and Connect for the ones on this Mac, the timer row's buttons, and your first focus. Already using Meowdoro? It won't open by itself: right-click the island → Welcome Tour…, or Settings → General.</li><li><b>Hints the first time something happens:</b> what the amber overtime counts, that a waiting agent's line opens its session, and what a grey session needs.</li><li><b>Agent rows say when it's time for /compact.</b> Past the threshold in Settings, the row says "Context 64% · time for /compact" in orange, on one-line and two-line rows alike.</li><li>The context ring's tooltip is back on one-line rows, and the minutes on each row say what they count: "Waiting for you for 6 min", "Finished 12 min ago".</li><li>About Meowdoro comes first in the right-click menu, with Welcome Tour… under it.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.17/Meowdoro-0.1.17.dmg" type="application/octet-stream" sparkle:edSignature="S0eV2jD+Zst4Xjk5LYQvSCtcyyTtLpeYbUi7m1ePeeU8UdZuO7JilIpnM9CJWd1ivavwehO95d1NVffrxnhWCQ==" length="9880650"/>
     </item>
   </channel>
 </rss>
