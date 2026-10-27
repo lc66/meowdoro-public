@@ -2,6 +2,13 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.18 — 2026-10-27
+
+- **Cards that wait for you.** Settings → Keep the card until I click it: the card when a phase ends, and the ones when a focus pauses by itself or can go on, stay until you click them, while the overtime counts. With the next phase starting by itself they still tuck themselves away.
+- Who needs you shows on those cards, live: dots under the button, for agents that failed, wait or finished. Click them for the list.
+- A click on a phase card beside its button puts it away.
+- **A paused timer is hard to miss.** The island's wings turn graphite beside the black notch, the cat falls asleep on its laptop, and ▶ turns amber, until you resume. Nothing blinks.
+
 ## Meowdoro 0.1.17 — 2026-10-26
 
 - **A welcome tour, right in the island.** Where Meowdoro is new, the island opens a one-minute tour: where it lives, the timer played in seconds, your agents with a demo row and Connect for the ones on this Mac, the timer row's buttons, and your first focus. Already using Meowdoro? It won't open by itself: right-click the island → Welcome Tour…, or Settings → General.
