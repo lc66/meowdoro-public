@@ -1,3 +1,9 @@
+<!-- For whoever edits this file (GitHub doesn't show this): the top, from the icon to the animation, stays as it is.
+New features go under "What it does": a line in their section's intro if it's big, otherwise into its <details> list;
+"Why Meowdoro" changes only when something big does. The animation is site/hero/readme.html rendered into
+assets/demo.webp (site/README.md says how); render it again when the island looks different. app/scripts/release.sh
+and remote/publish.sh run public/check.sh, which refuses a README that lost the animation. -->
+
 <p align="center">
   <img src="assets/icon.png" width="112" height="112" alt="">
 </p>
@@ -23,7 +29,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/demo.webp" width="720" alt="The Meowdoro island at a MacBook's notch: a focus counts down next to a cat at its laptop; a line says an agent has finished; a click opens the list of Claude Code and Codex sessions; when the focus ends, a card with the cat and its mug offers a five-minute break.">
+  <img src="assets/demo.webp" width="720" alt="The Meowdoro island at a MacBook's notch: a click on Focus starts 25 minutes, and the island folds into a cat at its laptop and the time; a line says an agent has finished; a click opens the list of Claude Code and Codex sessions; when the focus ends, a card with the cat and its mug offers a five-minute break.">
 </p>
 
 AI agents can work all day. People can't, and shouldn't have to. Meowdoro keeps a simple rhythm by the notch — 25 minutes on one thing, then a real break — and watches your Claude Code and Codex sessions for you. During a focus, the island shows which agents are working, finished or waiting for you. During a break they keep working, and their news waits until you're back.
