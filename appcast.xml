@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.17</title>
-      <pubDate>Mon, 26 Oct 2026 15:28:31 GMT</pubDate>
-      <sparkle:version>18</sparkle:version>
-      <sparkle:shortVersionString>0.1.17</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.18</title>
+      <pubDate>Tue, 27 Oct 2026 12:59:21 GMT</pubDate>
+      <sparkle:version>19</sparkle:version>
+      <sparkle:shortVersionString>0.1.18</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>A welcome tour, right in the island.</b> Where Meowdoro is new, the island opens a one-minute tour: where it lives, the timer played in seconds, your agents with a demo row and Connect for the ones on this Mac, the timer row's buttons, and your first focus. Already using Meowdoro? It won't open by itself: right-click the island → Welcome Tour…, or Settings → General.</li><li><b>Hints the first time something happens:</b> what the amber overtime counts, that a waiting agent's line opens its session, and what a grey session needs.</li><li><b>Agent rows say when it's time for /compact.</b> Past the threshold in Settings, the row says "Context 64% · time for /compact" in orange, on one-line and two-line rows alike.</li><li>The context ring's tooltip is back on one-line rows, and the minutes on each row say what they count: "Waiting for you for 6 min", "Finished 12 min ago".</li><li>About Meowdoro comes first in the right-click menu, with Welcome Tour… under it.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.17/Meowdoro-0.1.17.dmg" type="application/octet-stream" sparkle:edSignature="S0eV2jD+Zst4Xjk5LYQvSCtcyyTtLpeYbUi7m1ePeeU8UdZuO7JilIpnM9CJWd1ivavwehO95d1NVffrxnhWCQ==" length="9880650"/>
+      <description><![CDATA[<ul><li><b>Cards that wait for you.</b> Settings → Keep the card until I click it: the card when a phase ends, and the ones when a focus pauses by itself or can go on, stay until you click them, while the overtime counts. With the next phase starting by itself they still tuck themselves away.</li><li>Who needs you shows on those cards, live: dots under the button, for agents that failed, wait or finished. Click them for the list.</li><li>A click on a phase card beside its button puts it away.</li><li><b>A paused timer is hard to miss.</b> The island's wings turn graphite beside the black notch, the cat falls asleep on its laptop, and ▶ turns amber, until you resume. Nothing blinks.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.18/Meowdoro-0.1.18.dmg" type="application/octet-stream" sparkle:edSignature="msQ0uoUw+qFBiEEUMO0EuNIOrQkmQbAU/ArY3FW9bO5sDhGyzGjDsHSgqz7lLS9W7aButgmctb8MZUN3KBGyDw==" length="9938874"/>
     </item>
   </channel>
 </rss>
