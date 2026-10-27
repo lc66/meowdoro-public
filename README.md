@@ -1,12 +1,47 @@
-# Meowdoro
+<p align="center">
+  <img src="assets/icon.png" width="112" height="112" alt="">
+</p>
 
-A focus timer with a cat that lives around your MacBook's notch. It also shows what Claude Code and Codex are doing — on this Mac, and on other machines through a small helper.
+<h1 align="center">Meowdoro</h1>
 
-This repository holds Meowdoro's releases and the helper for remote machines. The app's source isn't here.
+<p align="center">
+  <b>Your agents don’t need breaks. You do.</b><br>
+  A pomodoro timer in your Mac’s notch that also keeps an eye on Claude Code and Codex.
+</p>
 
-## Download
+<p align="center">
+  <a href="https://github.com/lc66/meowdoro-public/releases/latest/download/Meowdoro.dmg"><img src="https://img.shields.io/github/v/release/lc66/meowdoro-public?display_name=release&filter=Meowdoro*&label=latest&style=flat-square&color=FFB224" alt="Latest version"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-black?style=flat-square&logo=apple" alt="macOS 14 or later">
+  <img src="https://img.shields.io/badge/Apple%20silicon%20%26%20Intel-555?style=flat-square" alt="Apple silicon and Intel">
+</p>
 
-**[Download the latest Meowdoro](https://github.com/lc66/meowdoro-public/releases/latest/download/Meowdoro.dmg)** (a DMG). What changed in each version: [CHANGELOG.md](CHANGELOG.md); older versions and their notes: [Releases](https://github.com/lc66/meowdoro-public/releases).
+<p align="center">
+  <a href="https://github.com/lc66/meowdoro-public/releases/latest/download/Meowdoro.dmg"><b>Download for Mac</b></a> ·
+  <a href="https://meowdoro.com">meowdoro.com</a> ·
+  <a href="CHANGELOG.md">What’s new</a> ·
+  <a href="#agents-on-other-machines">Agents on other machines</a>
+</p>
+
+<p align="center">
+  <img src="assets/demo.webp" width="720" alt="The Meowdoro island at a MacBook's notch: a focus counts down next to a cat at its laptop; a line says an agent has finished; a click opens the list of Claude Code and Codex sessions; when the focus ends, a card with the cat and its mug offers a five-minute break.">
+</p>
+
+AI agents can work all day. People can't, and shouldn't have to. Meowdoro keeps a simple rhythm by the notch — 25 minutes on one thing, then a real break — and watches your Claude Code and Codex sessions for you. During a focus, the island shows which agents are working, finished or waiting for you. During a break they keep working, and their news waits until you're back.
+
+This repository holds Meowdoro's releases and the helper for agents on other machines. The app's source isn't here.
+
+## Why Meowdoro
+
+- **A rhythm for you, not for the agents** — focus, short break, long break after four rounds, by the notch. All of it adjustable.
+- **Your agents at a glance** — Claude Code in the terminal or Claude Desktop, Codex in the terminal or ChatGPT, on this Mac and on other machines. One click opens a session.
+- **Quiet** — no Dock icon and no notification banners: one line slides out of the island, and during a break nothing reaches you.
+- **It only listens** — it never approves anything, never slows an agent down and never edits your agents' settings.
+- **Yours** — settings and statistics stay on your Mac. No account, no analytics.
+- **A cat by the notch** — at its laptop during a focus, with a mug on a break.
+
+## Install
+
+**[Download Meowdoro](https://github.com/lc66/meowdoro-public/releases/latest/download/Meowdoro.dmg)** (a DMG). What changed in each version: [CHANGELOG.md](CHANGELOG.md); older versions and their notes: [Releases](https://github.com/lc66/meowdoro-public/releases).
 
 - macOS 14 or later, Apple silicon or Intel. On a Mac without a notch it's a small bar in the middle of the top edge.
 - This test version isn't signed by Apple yet, so macOS refuses the first launch. Drag Meowdoro to Applications, then run this once in Terminal:
@@ -23,6 +58,11 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
 
 ### A focus timer around the notch
 
+Focus, short break and long break by the notch, with a cat that keeps the time. The island is the notification: no Dock icon, no banners.
+
+<details>
+<summary>Everything the timer does</summary>
+
 - Focus, short break and long break: 25, 5 and 15 minutes, the long break after 4 rounds. All of it is adjustable.
 - A cat sits next to the notch: at its laptop during focus, with a mug on a break. When a phase ends, the island slides out with a bigger cat and what comes next. No Dock icon, no notifications: the island is the notification.
 - The time in the notch as digits, a ring or a bar, counting down or up. It flashes when a minute is left.
@@ -33,9 +73,14 @@ This repository holds Meowdoro's releases and the helper for remote machines. Th
 - Do Not Disturb during focus, through two Shortcuts (only Shortcuts can switch a Focus on macOS). "Add Do Not Disturb shortcuts" in Settings adds Meowdoro's own in two clicks.
 - On the screen with the notch or on the main display; it can hide over full-screen apps.
 
+</details>
+
 ### Your agents at a glance
 
 Claude Code (in the terminal or Claude Desktop) and Codex (in the terminal or ChatGPT) show up in the island. Settings → Agents on this Mac shows a tile for each agent it finds, with a green ring once it's connected; Connect (or "Connect all…") installs a small plugin into each.
+
+<details>
+<summary>Everything about agents</summary>
 
 - Every session with what it's doing: working, waiting for you, finished, failed, grouped by agent. A click opens it in Claude Desktop or ChatGPT.
 - A session you've read — in the island, or in Claude Desktop or ChatGPT — dims and leaves 15 minutes later. One whose turn ended on a question for you (Claude Desktop's yellow dot) waits, with the question.
@@ -44,12 +89,19 @@ Claude Code (in the terminal or Claude Desktop) and Codex (in the terminal or Ch
 - Sessions that work in Figma, Canva and other design tools over MCP say so: "→ Figma", and a right-click opens the Figma file.
 - During focus, agent updates can wait until you peek; during breaks they always wait. Meowdoro only listens: it never approves anything and never slows an agent down.
 
+</details>
+
 ### Statistics
 
 The day, the week or the month: focus time, finished sessions, rest, and the work-to-rest ratio, with a chart by hour or by day.
 
+<details>
+<summary>Projects and the journal</summary>
+
 - **Projects:** a focus with agents on screen counts in full for every project worked on during it: its agents did something, or you wrote to them or opened their session. Reading an agent's answer counts too: if no agent moved during the focus, it goes to the ones that finished in the break before it. With agents hidden, a focus counts for no project.
 - **Journal:** every focus and break of the day, with its name and projects. Rename a focus, or delete a record entered by mistake.
+
+</details>
 
 ### Privacy
 
@@ -70,6 +122,9 @@ Meowdoro shows the line in Settings → Remote agents. It looks like this:
 curl -fsSL https://raw.githubusercontent.com/lc66/meowdoro-public/main/install.sh | sh -s -- https://<relay> <code> [name]
 ```
 
+<details>
+<summary>How the helper works, updating and removing it</summary>
+
 - Needs `python3` (3.8+, standard library only) and `curl`.
 - `install.sh` downloads the helper of its own release by tag and runs it only if its SHA-256 matches.
 - `<code>` carries the channel and the encryption key made on your Mac; it is saved to `~/.meowdoro/remote.json` (owner-only).
@@ -82,9 +137,14 @@ curl -fsSL https://raw.githubusercontent.com/lc66/meowdoro-public/main/install.s
 - Several Macs can watch the same machine: run each Mac's line there. The helper sends to all of them (up to 8), each sealed with its own key. `python3 ~/.meowdoro/bin/meowdoro-remote list` shows them, `… remove <number>` stops one.
 - Update: run the line again (Settings says when a newer helper is out; it never updates itself). Remove: `python3 ~/.meowdoro/bin/meowdoro-remote uninstall`.
 
-### What leaves that machine
+</details>
+
+<details>
+<summary>What leaves that machine</summary>
 
 Only status: agent, session id, event (working / waiting / finished / error / closed), project name (the git repository's folder name), the session's title, a tool's name when it asks for permission or is an MCP tool, how full the session's context is, Codex's plan limits, whether you've read a finished session there, the question Claude Desktop says a turn ended on (its own one-line summary), which agents have the plugin, the ChatGPT login Codex uses there as a fingerprint (a hash, not the account or the user) and its email masked to the first two letters and the domain (`gl…@gmail.com`; machines with the same login share their limits on your Mac), Claude Code's version when it's too old for it (and that of each session that sends nothing), the machine's name, the helper's version, a timestamp. Never prompts, tool inputs or outputs, file contents, paths or the agent's replies. Everything is encrypted with AES-256-GCM before it leaves; the relay can't read it.
+
+</details>
 
 ## Versions
 
