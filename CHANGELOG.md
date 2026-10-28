@@ -2,6 +2,10 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.22 — 2026-10-28
+
+- **A question you've read stops calling.** When a session's turn ends on a question, it waits in orange and counts on the cat. Once you open that session in Claude Desktop, on this Mac or on a remote machine, or click its row in the island, the row stays, orange and with the question, but dims and no longer counts. It goes when you answer. A request for permission still counts until you answer it in the session.
+
 ## Meowdoro 0.1.21 — 2026-10-28
 
 - **Fixed: answered sessions stuck waiting after a restart.** In 0.1.20, catching up after a restart could bring back a question from an earlier turn in Claude Desktop on a remote machine, leaving a session yellow and waiting though you'd long answered it. Old questions and reads now stay in the past. A row already stuck goes with that session's next event, or right-click → Remove from List.
