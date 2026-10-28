@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.19</title>
-      <pubDate>Wed, 28 Oct 2026 03:58:51 GMT</pubDate>
-      <sparkle:version>20</sparkle:version>
-      <sparkle:shortVersionString>0.1.19</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.20</title>
+      <pubDate>Wed, 28 Oct 2026 04:34:58 GMT</pubDate>
+      <sparkle:version>21</sparkle:version>
+      <sparkle:shortVersionString>0.1.20</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>Name a focus right after it.</b> On the card when a focus ends, the pencil beside ▶ Break asks what you got done, and the answer goes into that focus's record in Statistics. On ▶ Focus after a break, it names the next focus. Skipped the card? Through the break, the open island shows your last focus with Name it.</li><li><b>Your agents are there in the morning.</b> For agents, a break lasts until you start the next focus. It now also ends once the timer has stood still for 4 hours, overnight or during the day, so an evening break no longer hides them until your first Start.</li><li><b>New cats:</b> asleep on its laptop beside the notch while the timer is paused, and floating cross-legged over a rug with a mug on the card before a break.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.19/Meowdoro-0.1.19.dmg" type="application/octet-stream" sparkle:edSignature="SKcjkvw4fghBNo4v8b/edO1ux05uSt7hhfXiPuCepATbvOpwdAFgcTCm/+Zka0PH268lcd5wTj2Yef7P7uEACw==" length="9942455"/>
+      <description><![CDATA[<ul><li><b>Remote agents stay put after a restart.</b> When Meowdoro starts, it catches up on the last half hour from your machines. That no longer makes the rows flicker through old states, flash sessions that were closed, or bring back finished sessions you'd already read as new.</li><li><b>Skipping a break shows your agents right away.</b> Skip or ⏮ out of a break ends it for agents too. A break that runs out still lasts until you start the focus.</li><li><b>A ✓ beside the name fields,</b> as on the cards: in the Last focus row and when you name the current focus. A click on it saves, like Return.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.20/Meowdoro-0.1.20.dmg" type="application/octet-stream" sparkle:edSignature="gNi25bAWpGegVPcwn/wBiUvVAPpmqddNXRljxnaa/mULvtwWagpgAEAjQC+46WyMWhYEijVgAvSvlVuPUe6CDA==" length="9969905"/>
     </item>
   </channel>
 </rss>
