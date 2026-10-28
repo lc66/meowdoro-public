@@ -2,6 +2,12 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.20 — 2026-10-28
+
+- **Remote agents stay put after a restart.** When Meowdoro starts, it catches up on the last half hour from your machines. That no longer makes the rows flicker through old states, flash sessions that were closed, or bring back finished sessions you'd already read as new.
+- **Skipping a break shows your agents right away.** Skip or ⏮ out of a break ends it for agents too. A break that runs out still lasts until you start the focus.
+- **A ✓ beside the name fields,** as on the cards: in the Last focus row and when you name the current focus. A click on it saves, like Return.
+
 ## Meowdoro 0.1.19 — 2026-10-28
 
 - **Name a focus right after it.** On the card when a focus ends, the pencil beside ▶ Break asks what you got done, and the answer goes into that focus's record in Statistics. On ▶ Focus after a break, it names the next focus. Skipped the card? Through the break, the open island shows your last focus with Name it.
