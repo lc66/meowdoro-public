@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.20</title>
-      <pubDate>Wed, 28 Oct 2026 04:34:58 GMT</pubDate>
-      <sparkle:version>21</sparkle:version>
-      <sparkle:shortVersionString>0.1.20</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.21</title>
+      <pubDate>Wed, 28 Oct 2026 05:37:41 GMT</pubDate>
+      <sparkle:version>22</sparkle:version>
+      <sparkle:shortVersionString>0.1.21</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>Remote agents stay put after a restart.</b> When Meowdoro starts, it catches up on the last half hour from your machines. That no longer makes the rows flicker through old states, flash sessions that were closed, or bring back finished sessions you'd already read as new.</li><li><b>Skipping a break shows your agents right away.</b> Skip or ⏮ out of a break ends it for agents too. A break that runs out still lasts until you start the focus.</li><li><b>A ✓ beside the name fields,</b> as on the cards: in the Last focus row and when you name the current focus. A click on it saves, like Return.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.20/Meowdoro-0.1.20.dmg" type="application/octet-stream" sparkle:edSignature="gNi25bAWpGegVPcwn/wBiUvVAPpmqddNXRljxnaa/mULvtwWagpgAEAjQC+46WyMWhYEijVgAvSvlVuPUe6CDA==" length="9969905"/>
+      <description><![CDATA[<ul><li><b>Fixed: answered sessions stuck waiting after a restart.</b> In 0.1.20, catching up after a restart could bring back a question from an earlier turn in Claude Desktop on a remote machine, leaving a session yellow and waiting though you'd long answered it. Old questions and reads now stay in the past. A row already stuck goes with that session's next event, or right-click → Remove from List.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.21/Meowdoro-0.1.21.dmg" type="application/octet-stream" sparkle:edSignature="1ECt+YcjKgeZG/2KG27kWmsW/zzWUBaKWzQ+g9OUVW9SV4yFUhqk7zj//h+2Iv+HPjZAJQIHh2Ak9et3DcQuAA==" length="9973842"/>
     </item>
   </channel>
 </rss>
