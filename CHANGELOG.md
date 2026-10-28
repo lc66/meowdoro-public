@@ -2,6 +2,10 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.21 — 2026-10-28
+
+- **Fixed: answered sessions stuck waiting after a restart.** In 0.1.20, catching up after a restart could bring back a question from an earlier turn in Claude Desktop on a remote machine, leaving a session yellow and waiting though you'd long answered it. Old questions and reads now stay in the past. A row already stuck goes with that session's next event, or right-click → Remove from List.
+
 ## Meowdoro 0.1.20 — 2026-10-28
 
 - **Remote agents stay put after a restart.** When Meowdoro starts, it catches up on the last half hour from your machines. That no longer makes the rows flicker through old states, flash sessions that were closed, or bring back finished sessions you'd already read as new.
