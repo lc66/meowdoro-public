@@ -2,6 +2,12 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.19 — 2026-10-28
+
+- **Name a focus right after it.** On the card when a focus ends, the pencil beside ▶ Break asks what you got done, and the answer goes into that focus's record in Statistics. On ▶ Focus after a break, it names the next focus. Skipped the card? Through the break, the open island shows your last focus with Name it.
+- **Your agents are there in the morning.** For agents, a break lasts until you start the next focus. It now also ends once the timer has stood still for 4 hours, overnight or during the day, so an evening break no longer hides them until your first Start.
+- **New cats:** asleep on its laptop beside the notch while the timer is paused, and floating cross-legged over a rug with a mug on the card before a break.
+
 ## Meowdoro 0.1.18 — 2026-10-27
 
 - **Cards that wait for you.** Settings → Keep the card until I click it: the card when a phase ends, and the ones when a focus pauses by itself or can go on, stay until you click them, while the overtime counts. With the next phase starting by itself they still tuck themselves away.
