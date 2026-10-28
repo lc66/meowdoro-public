@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.21</title>
-      <pubDate>Wed, 28 Oct 2026 05:37:41 GMT</pubDate>
-      <sparkle:version>22</sparkle:version>
-      <sparkle:shortVersionString>0.1.21</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.22</title>
+      <pubDate>Wed, 28 Oct 2026 06:05:32 GMT</pubDate>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>0.1.22</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>Fixed: answered sessions stuck waiting after a restart.</b> In 0.1.20, catching up after a restart could bring back a question from an earlier turn in Claude Desktop on a remote machine, leaving a session yellow and waiting though you'd long answered it. Old questions and reads now stay in the past. A row already stuck goes with that session's next event, or right-click → Remove from List.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.21/Meowdoro-0.1.21.dmg" type="application/octet-stream" sparkle:edSignature="1ECt+YcjKgeZG/2KG27kWmsW/zzWUBaKWzQ+g9OUVW9SV4yFUhqk7zj//h+2Iv+HPjZAJQIHh2Ak9et3DcQuAA==" length="9973842"/>
+      <description><![CDATA[<ul><li><b>A question you've read stops calling.</b> When a session's turn ends on a question, it waits in orange and counts on the cat. Once you open that session in Claude Desktop, on this Mac or on a remote machine, or click its row in the island, the row stays, orange and with the question, but dims and no longer counts. It goes when you answer. A request for permission still counts until you answer it in the session.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.22/Meowdoro-0.1.22.dmg" type="application/octet-stream" sparkle:edSignature="PydzBsXKxQ/+V+ITzIgtp7dZw4vvo2ItNWCVZhI/NXOPLoQLd06R11vGiaIVOFgkURp6J2fZlmxBuqS9gkCMDQ==" length="9995265"/>
     </item>
   </channel>
 </rss>
