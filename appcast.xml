@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.18</title>
-      <pubDate>Tue, 27 Oct 2026 12:59:21 GMT</pubDate>
-      <sparkle:version>19</sparkle:version>
-      <sparkle:shortVersionString>0.1.18</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.19</title>
+      <pubDate>Wed, 28 Oct 2026 03:58:51 GMT</pubDate>
+      <sparkle:version>20</sparkle:version>
+      <sparkle:shortVersionString>0.1.19</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>Cards that wait for you.</b> Settings → Keep the card until I click it: the card when a phase ends, and the ones when a focus pauses by itself or can go on, stay until you click them, while the overtime counts. With the next phase starting by itself they still tuck themselves away.</li><li>Who needs you shows on those cards, live: dots under the button, for agents that failed, wait or finished. Click them for the list.</li><li>A click on a phase card beside its button puts it away.</li><li><b>A paused timer is hard to miss.</b> The island's wings turn graphite beside the black notch, the cat falls asleep on its laptop, and ▶ turns amber, until you resume. Nothing blinks.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.18/Meowdoro-0.1.18.dmg" type="application/octet-stream" sparkle:edSignature="msQ0uoUw+qFBiEEUMO0EuNIOrQkmQbAU/ArY3FW9bO5sDhGyzGjDsHSgqz7lLS9W7aButgmctb8MZUN3KBGyDw==" length="9938874"/>
+      <description><![CDATA[<ul><li><b>Name a focus right after it.</b> On the card when a focus ends, the pencil beside ▶ Break asks what you got done, and the answer goes into that focus's record in Statistics. On ▶ Focus after a break, it names the next focus. Skipped the card? Through the break, the open island shows your last focus with Name it.</li><li><b>Your agents are there in the morning.</b> For agents, a break lasts until you start the next focus. It now also ends once the timer has stood still for 4 hours, overnight or during the day, so an evening break no longer hides them until your first Start.</li><li><b>New cats:</b> asleep on its laptop beside the notch while the timer is paused, and floating cross-legged over a rug with a mug on the card before a break.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.19/Meowdoro-0.1.19.dmg" type="application/octet-stream" sparkle:edSignature="SKcjkvw4fghBNo4v8b/edO1ux05uSt7hhfXiPuCepATbvOpwdAFgcTCm/+Zka0PH268lcd5wTj2Yef7P7uEACw==" length="9942455"/>
     </item>
   </channel>
 </rss>
