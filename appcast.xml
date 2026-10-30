@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.22</title>
-      <pubDate>Wed, 28 Oct 2026 06:05:32 GMT</pubDate>
-      <sparkle:version>23</sparkle:version>
-      <sparkle:shortVersionString>0.1.22</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.23</title>
+      <pubDate>Fri, 30 Oct 2026 04:38:40 GMT</pubDate>
+      <sparkle:version>24</sparkle:version>
+      <sparkle:shortVersionString>0.1.23</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>A question you've read stops calling.</b> When a session's turn ends on a question, it waits in orange and counts on the cat. Once you open that session in Claude Desktop, on this Mac or on a remote machine, or click its row in the island, the row stays, orange and with the question, but dims and no longer counts. It goes when you answer. A request for permission still counts until you answer it in the session.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.22/Meowdoro-0.1.22.dmg" type="application/octet-stream" sparkle:edSignature="PydzBsXKxQ/+V+ITzIgtp7dZw4vvo2ItNWCVZhI/NXOPLoQLd06R11vGiaIVOFgkURp6J2fZlmxBuqS9gkCMDQ==" length="9995265"/>
+      <description><![CDATA[<ul><li><b>Signed and notarized by Apple.</b> Meowdoro now opens with a double-click: drag it to Applications and open it, with no Terminal command and no read-me to follow first. macOS names its developer as HashEx US, LLC. If you already have Meowdoro, this version comes as a usual update in the island.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.23/Meowdoro-0.1.23.dmg" type="application/octet-stream" sparkle:edSignature="bFFrH/cfk85WwjQh5fz0ArmUhpuChhnJy56Q/Wng/0qRSX1GQQPzGmMXKxlHjFzJAnkyBvLRHsYkfpQftVEODQ==" length="10073720"/>
     </item>
   </channel>
 </rss>
