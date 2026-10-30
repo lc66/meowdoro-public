@@ -2,6 +2,10 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.23 — 2026-10-30
+
+- **Signed and notarized by Apple.** Meowdoro now opens with a double-click: drag it to Applications and open it, with no Terminal command and no read-me to follow first. macOS names its developer as HashEx US, LLC. If you already have Meowdoro, this version comes as a usual update in the island.
+
 ## Meowdoro 0.1.22 — 2026-10-28
 
 - **A question you've read stops calling.** When a session's turn ends on a question, it waits in orange and counts on the cat. Once you open that session in Claude Desktop, on this Mac or on a remote machine, or click its row in the island, the row stays, orange and with the question, but dims and no longer counts. It goes when you answer. A request for permission still counts until you answer it in the session.

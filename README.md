@@ -50,13 +50,7 @@ This repository holds Meowdoro's releases and the helper for agents on other mac
 **[Download Meowdoro](https://github.com/lc66/meowdoro-public/releases/latest/download/Meowdoro.dmg)** (a DMG). What changed in each version: [CHANGELOG.md](CHANGELOG.md); older versions and their notes: [Releases](https://github.com/lc66/meowdoro-public/releases).
 
 - macOS 14 or later, Apple silicon or Intel. On a Mac without a notch it's a small bar in the middle of the top edge.
-- This test version isn't signed by Apple yet, so macOS refuses the first launch. Drag Meowdoro to Applications, then run this once in Terminal:
-
-  ```sh
-  xattr -dr com.apple.quarantine /Applications/Meowdoro.app
-  ```
-
-  The read-me inside the DMG walks through it. Once the app is signed, this step goes away.
+- Open the DMG and drag Meowdoro to Applications. It's signed and notarized by Apple, so it opens with a double-click.
 - From 0.1.13 Meowdoro updates itself: once a day it looks for a newer version, says so in the island, and installs it when you press Install. Updates are signed, and Meowdoro installs only ones signed with its own key. Settings has the switch and Check Now; right-click the island for Check for Updates. Versions before 0.1.13 need this one installed by hand.
 - No Dock or menu bar icon: click the island to open it, right-click it for Settings and Quit.
 
