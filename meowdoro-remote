@@ -10,7 +10,9 @@
           numbers to the event. Encrypts each event (AES-256-GCM, key from the setup command; the relay only
           sees ciphertext), sends it, retries, checks every 15 s that the agents are still running and whether
           a finished session was read in Claude Desktop or ChatGPT here, and sends a heartbeat every minute
-          (with which agents have the plugin, for the Mac's Settings).
+          (with which agents have the plugin, for the Mac's Settings). Keeps its own sessions as the Mac's board
+          would and sends their summary (what a phone shows: MachineSummary in the app) when it changes and every
+          15 minutes, so a paired iPhone hears this machine without the Mac.
 - setup:  `meowdoro-remote setup <relay-url> <code>` adds that Meowdoro's relay, channel and key to the ones this
           machine sends to (each Mac's line adds its Mac; the same line again replaces it), then asks Claude Code
           and Codex to install the helper's plugin, meowdoro-remote (their own commands). One plugin, however many
@@ -44,6 +46,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 
 HOME = os.path.expanduser("~/.meowdoro")
 CONFIG = os.path.join(HOME, "remote.json")
@@ -57,7 +60,7 @@ PLUGIN = "meowdoro-remote"
 PLUGIN_ID = f"{PLUGIN}@{PLUGIN}"
 # Helpers before 0.5.0 installed theirs from PLUGINS under the app's name; setup and uninstall take that one away.
 OLD_PLUGIN = "meowdoro"
-VERSION = "0.6.2"
+VERSION = "0.7.0"
 # What the Mac decodes. Changes to the messages only ever add fields; a change old Meowdoros can't read bumps this,
 # and they then say "needs a newer Meowdoro" for this machine instead of guessing.
 PROTOCOL = 1
@@ -93,6 +96,20 @@ CHATGPT_UNREAD_DELAY = 60
 CLAUDE_SUMMARY_WAIT = 10 * 60
 # While Codex waits for its hooks to be trusted, asked again this often: the user is likely doing it right now.
 APPROVAL_EVERY = 60
+# The summary for the phone (MachineSummary): looked at this often, sent when what it shows changed, and again every
+# SUMMARY_EVERY so a phone that opens its app finds it in the relay's history. At most SUMMARY_LIMIT sessions.
+SUMMARY_CHECK = 2
+SUMMARY_EVERY = 15 * 60
+SUMMARY_LIMIT = 8
+SUMMARY_TITLE = 80
+SUMMARY_DETAIL = 120
+# A busy agent that says nothing for this long has probably been closed or interrupted (AgentBoard.quietAfter).
+QUIET_AFTER = 30 * 60
+# Order in the summary: stuck first, then waiting, then finished (AgentActivity.urgency).
+URGENCY = {"failed": 0, "waiting": 1, "finished": 2, "working": 3}
+# The relay's envelope version that keeps "z" and "s" (relay of 2026-11 on); older ones pass only {n, c}.
+RELAY_ENVELOPE = 2
+RELAY_CHECK_EVERY = 60 * 60
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -269,6 +286,66 @@ def compact(agent, payload):
     if name == "StopFailure" and isinstance(payload.get("error"), str):
         event["error"] = payload["error"][:80]
     return event
+
+
+def board_state(name, event):
+    """What a hook says about its session, as the Mac reads it (AgentEvent.parse, AgentBoard.apply): (activity,
+    detail)."""
+    tool = event.get("tool_name")
+    if name in WORKING:
+        return "working", None
+    if name == "PreToolUse":
+        return ("waiting", "has a question") if tool in ("AskUserQuestion", "ExitPlanMode") else ("working", None)
+    if name == "PermissionRequest":
+        return "waiting", (f"wants to use {tool}" if tool else None)
+    if name == "Stop":
+        return "finished", None
+    if name == "StopFailure":
+        return "failed", (event["error"].replace("_", " ") if event.get("error") else None)
+    # SessionStart, Interrupt: nothing worth showing.
+    return "idle", None
+
+
+def board_event(board, name, event, carries_on, now):
+    """One event on a session's board entry (`{"project", "title", "activity", "detail", "since", "needs_you"}`): its
+    state changes only when what it shows does, so a busy session's tool calls change nothing. A session starting
+    again (after /compact) carries on as it was."""
+    when = event.get("t", now)
+    project = event.get("project")
+    if project and board.get("project") in (None, "—"):
+        board["project"] = project
+    if event.get("session_title"):
+        board["title"] = event["session_title"]
+    activity, detail = board_state(name, event)
+    if not carries_on and (activity, detail) != (board.get("activity"), board.get("detail")):
+        board.update(activity=activity, detail=detail, since=when, needs_you=activity in ("waiting", "finished", "failed"))
+
+
+def summary_of(sessions, machine, now):
+    """This machine's sessions as a phone shows them (MachineSummary.wire): most urgent first, then the latest state
+    first, then by id; at most SUMMARY_LIMIT, the rest counted in "more". No prompts, replies or paths."""
+    shown = []
+    for key, session in sessions.items():
+        board = session.get("board")
+        if not board or board.get("activity") not in URGENCY:
+            continue
+        agent, session_id = key.split(":", 1)
+        item = {"agent": agent, "session_id": session_id, "project": board.get("project") or "—",
+                "activity": board["activity"], "since": board["since"], "needs_you": bool(board.get("needs_you"))}
+        if board.get("title"):
+            item["title"] = board["title"][:SUMMARY_TITLE]
+        if board.get("detail"):
+            item["detail"] = board["detail"][:SUMMARY_DETAIL]
+        shown.append((URGENCY[board["activity"]], -board["since"], key, item))
+    shown.sort(key=lambda entry: entry[:3])
+    return {"type": "summary", "machine": machine, "t": now, "sessions": [entry[3] for entry in shown[:SUMMARY_LIMIT]],
+            "more": max(0, len(shown) - SUMMARY_LIMIT)}
+
+
+def deflate(data):
+    """Raw DEFLATE, as Apple's zlib decoder reads it (NSData.decompressed(using: .zlib))."""
+    packer = zlib.compressobj(9, zlib.DEFLATED, -15)
+    return packer.compress(data) + packer.flush()
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1006,11 +1083,15 @@ class Target:
     """One Meowdoro this machine sends to: its relay, channel and key, with a queue and retries of its own, so a relay
     that's down for one Mac doesn't hold up the others."""
 
-    def __init__(self, target):
+    def __init__(self, target, slot=None):
         self.relay = target["relay"].rstrip("/")
         self.channel = target["channel"]
         self.key = unb64u(target["key"])
         self.outbox = queue.Queue(maxsize=500)
+        # This machine's anonymous tag, so the relay and the push service keep the latest summary of each machine.
+        self.slot = slot
+        # Whether the relay keeps "z" and "s" in envelopes (`relay_envelope`), and when that was last asked.
+        self.envelope_v2, self.envelope_asked = False, 0
 
     def send(self, message):
         try:
@@ -1028,11 +1109,31 @@ class Target:
             backoff = 1
 
     def envelope(self, message, nonce=None):
-        """What the relay gets: `{"n": nonce, "c": ciphertext + tag}`, sealed with the channel as associated data."""
+        """What the relay gets: `{"n": nonce, "c": ciphertext + tag}`, sealed with the channel as associated data. A
+        summary, on a relay that keeps them, goes deflated (`"z": 1`) with this machine's tag (`"s"`)."""
         nonce = nonce or os.urandom(12)
         # Every message says which protocol and helper made it: the Mac shows the helper version per machine.
         plaintext = json.dumps(dict(message, v=PROTOCOL, helper=VERSION, t=message.get("t", time.time()))).encode()
-        return json.dumps({"n": b64u(nonce), "c": b64u(seal(self.key, nonce, plaintext, self.channel.encode()))}).encode()
+        extra = {}
+        if message.get("type") == "summary" and self.slot and self.relay_envelope() >= RELAY_ENVELOPE:
+            plaintext = deflate(plaintext)
+            extra = {"z": 1, "s": self.slot}
+        sealed = b64u(seal(self.key, nonce, plaintext, self.channel.encode()))
+        return json.dumps(dict({"n": b64u(nonce), "c": sealed}, **extra)).encode()
+
+    def relay_envelope(self):
+        """The relay's envelope version from its /healthz (1 when it doesn't say), asked again every RELAY_CHECK_EVERY:
+        a relay updated meanwhile starts getting summaries deflated."""
+        now = time.time()
+        if now - self.envelope_asked >= RELAY_CHECK_EVERY:
+            self.envelope_asked = now
+            try:
+                request = urllib.request.Request(f"{self.relay}/healthz", headers={"user-agent": f"meowdoro-remote/{VERSION}"})
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    self.envelope_v2 = int(json.loads(response.read() or b"{}").get("envelope", 1)) >= RELAY_ENVELOPE
+            except Exception:
+                self.envelope_v2 = False
+        return RELAY_ENVELOPE if self.envelope_v2 else 1
 
     def deliver(self, message, timeout=10):
         """POSTs one message: the relay's HTTP status, or None when it can't be reached."""
@@ -1055,11 +1156,14 @@ class Target:
 
 class Daemon:
     def __init__(self, config):
-        self.targets = [Target(target) for target in targets_of(config)]
+        self.targets = [Target(target, config.get("slot")) for target in targets_of(config)]
         self.machine = config.get("name") or socket.gethostname().split(".")[0]
+        # What the summary sent last showed, and when: sent again when it changes, and every SUMMARY_EVERY.
+        self.summary_sent, self.summary_at = None, 0
         self.inbox = queue.Queue()
         # "agent:session" -> {"pid", "kind", "sent", "app", "transcript", "read", "context", "shown",
-        #                     "finished", "read_sent", "saw_unread", "file", "in_app", "summarized"} (see check_apps)
+        #                     "finished", "read_sent", "saw_unread", "file", "in_app", "summarized"} (see check_apps),
+        #                     and "board": the session as the summary shows it (board_event)
         self.sessions = {}
         # Plan limits per agent: per account, so any of its sessions may bring a newer reading.
         self.limits = {}
@@ -1109,8 +1213,11 @@ class Daemon:
                 session = self.sessions.setdefault(key, {"pid": None, "kind": None, "sent": 0, "app": None,
                                                          "transcript": None, "read": 0, "context": None, "shown": None,
                                                          "finished": None, "read_sent": False, "saw_unread": False,
-                                                         "file": None, "in_app": None, "summarized": None})
+                                                         "file": None, "in_app": None, "summarized": None,
+                                                         "board": {"activity": "idle", "since": now}})
                 session["pid"] = pid or session["pid"]
+                session["board"]["last"] = now
+                board_event(session["board"], name, event, carries_on, now)
                 if isinstance(transcript, str) and transcript:
                     session["transcript"] = transcript
         if agent == "codex" and (self.agents or {}).get("codex") == "needs_approval":
@@ -1173,6 +1280,8 @@ class Daemon:
                     if session["pid"] and not alive(session["pid"]):
                         closed.append(key)
                         del self.sessions[key]
+                    elif session["board"].get("activity") == "working" and now - session["board"].get("last", now) > QUIET_AFTER:
+                        session["board"].update(activity="idle", since=now)
                 alive_keys = list(self.sessions)
                 # Sessions that send nothing keep it up too: the Mac lists them until they speak or close.
                 if self.sessions or self.unheard:
@@ -1195,9 +1304,27 @@ class Daemon:
                 self.send(self.heartbeat(alive_keys, now))
                 last_beat = now
             if idle > QUIT_AFTER_IDLE and all(target.outbox.empty() for target in self.targets):
+                self.send(summary_of({}, self.machine, now))
                 self.send(dict(self.heartbeat([], now), bye=True))
                 time.sleep(3)
                 os._exit(0)
+
+    def summaries(self):
+        """Every SUMMARY_CHECK: the summary, when what it shows changed (a burst of events goes as one), and again
+        every SUMMARY_EVERY."""
+        while True:
+            time.sleep(SUMMARY_CHECK)
+            try:
+                now = time.time()
+                with self.lock:
+                    summary = summary_of(self.sessions, self.machine, now)
+                    shows = (summary["sessions"], summary["more"])
+                    if shows == self.summary_sent and now - self.summary_at < SUMMARY_EVERY:
+                        continue
+                    self.summary_sent, self.summary_at = shows, now
+                self.send(summary)
+            except Exception:
+                pass
 
     def refresh_unheard(self):
         """Claude Code sessions here that send nothing (`unheard_sessions`), looked up for each heartbeat; the ones
@@ -1304,6 +1431,17 @@ class Daemon:
                     # A new event came meanwhile: this was about a reply that's no longer the last.
                     read = [k for k in read if k != key]
                     questions.pop(key, None)
+        with self.lock:
+            # On the summary too: a turn that ended on a question waits for the user with it (AgentBoard.markAsking);
+            # one read in its app here is no longer news (markRead).
+            for key, question in questions.items():
+                board = self.sessions.get(key, {}).get("board")
+                if board and board.get("activity") == "finished":
+                    board.update(activity="waiting", detail=question[:SUMMARY_DETAIL], needs_you=True)
+            for key in read:
+                board = self.sessions.get(key, {}).get("board")
+                if board:
+                    board["needs_you"] = False
         for key, question in questions.items():
             agent, session_id = key.split(":", 1)
             self.send({"type": "question", "agent": agent, "session_id": session_id, "machine": self.machine, "question": question, "t": now})
@@ -1336,6 +1474,10 @@ def daemon():
     config = load_config()
     if not targets_of(config):
         return
+    if not config.get("slot"):
+        # This machine's anonymous tag for its summary: random, never its name.
+        config["slot"] = b64u(os.urandom(12))
+        save_config(config)
     worker = Daemon(config)
 
     class Handler(socketserver.StreamRequestHandler):
@@ -1357,6 +1499,7 @@ def daemon():
     for target in worker.targets:
         threading.Thread(target=target.sender, daemon=True).start()
     threading.Thread(target=worker.watch, daemon=True).start()
+    threading.Thread(target=worker.summaries, daemon=True).start()
     worker.send({"type": "heartbeat", "machine": worker.machine, "sessions": [], "t": time.time()})
     server.serve_forever()
 

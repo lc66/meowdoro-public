@@ -2,6 +2,10 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Helper 0.7.0 — 2026-11-03
+
+- **Your iPhone hears this machine itself.** The helper sums up its sessions the way your Mac shows them: project, the session's name, waiting, finished or failed, and the question it asks. It sends that summary when it changes and every 15 minutes, so Meowdoro for iPhone (in testing) shows this machine's agents even while your Mac is off. Prompts, replies and paths still never leave the machine. Your Mac keeps getting every event, as before.
+
 ## Meowdoro 0.1.23 — 2026-10-30
 
 - **Signed and notarized by Apple.** Meowdoro now opens with a double-click: drag it to Applications and open it, with no Terminal command and no read-me to follow first. macOS names its developer as HashEx US, LLC. If you already have Meowdoro, this version comes as a usual update in the island.
