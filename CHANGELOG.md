@@ -2,6 +2,12 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.24 — 2026-11-03
+
+- **Your iPhone follows this Mac.** Settings → iPhone pairs Meowdoro for iPhone. Its Lock Screen shows this Mac's timer and your agents, Pause and Skip work on both, and while you're away from the Mac your iPhone purrs at the end of a session. Sessions from both sides land in one set of statistics. Meowdoro for iPhone is in testing now: to try it, write to [meow@meowdoro.com](mailto:meow@meowdoro.com).
+- **The timer carries over a quit.** Quitting Meowdoro, an update or a restart no longer starts your set over. A focus back within 2 minutes goes on as if nothing happened; after longer, it waits paused with the time it had. A break runs on by the clock.
+- **Fixed: a session could end without the card and the purr.** After the Mac woke and you unlocked it right away, Meowdoro could keep thinking you were away, so the end of a session waited for a return that had already happened.
+
 ## Helper 0.7.0 — 2026-11-03
 
 - **Your iPhone hears this machine itself.** The helper sums up its sessions the way your Mac shows them: project, the session's name, waiting, finished or failed, and the question it asks. It sends that summary when it changes and every 15 minutes, so Meowdoro for iPhone (in testing) shows this machine's agents even while your Mac is off. Prompts, replies and paths still never leave the machine. Your Mac keeps getting every event, as before.
