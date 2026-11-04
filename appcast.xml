@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.25</title>
-      <pubDate>Wed, 04 Nov 2026 09:06:19 GMT</pubDate>
-      <sparkle:version>26</sparkle:version>
-      <sparkle:shortVersionString>0.1.25</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.26</title>
+      <pubDate>Wed, 04 Nov 2026 12:28:31 GMT</pubDate>
+      <sparkle:version>27</sparkle:version>
+      <sparkle:shortVersionString>0.1.26</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>No night of overtime on your iPhone.</b> Its Lock Screen card shows a break's overtime for half an hour, then goes, even with your Mac asleep, and comes back when you press Start. A focus's overtime or a pause stays until the set starts over after 4 hours, as on the Mac, and then your iPhone starts over too. Meowdoro for iPhone is in testing now: to try it, write to [meow@meowdoro.com](mailto:meow@meowdoro.com).</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.25/Meowdoro-0.1.25.dmg" type="application/octet-stream" sparkle:edSignature="P/69wtyRR46grJsq0PvcooAF3xWK9WLpUMJ2D3RlxNGF68t4SEkTky5qozBDOLsXvj8QYCXBAGsARcZDn0aHAg==" length="10847754"/>
+      <description><![CDATA[<ul><li><b>A fresh start after lunch, not only overnight.</b> After 2 hours with nothing running, instead of 4, the timer starts over from the first round. On your iPhone, a pause or a focus's overtime now leaves the Lock Screen after 2 hours too.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.26/Meowdoro-0.1.26.dmg" type="application/octet-stream" sparkle:edSignature="mLY+S4+biIwno/mVEa3xO4Tk+P9ffmDM+JJnhTrSogMpqjxmR7OSc0ODY7kEzuBYYaO7uWfyfmKzLvS8Uz/WCw==" length="10847761"/>
     </item>
   </channel>
 </rss>
