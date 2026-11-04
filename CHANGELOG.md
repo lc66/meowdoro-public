@@ -2,6 +2,10 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.26 — 2026-11-04
+
+- **A fresh start after lunch, not only overnight.** After 2 hours with nothing running, instead of 4, the timer starts over from the first round. On your iPhone, a pause or a focus's overtime now leaves the Lock Screen after 2 hours too.
+
 ## Meowdoro 0.1.25 — 2026-11-04
 
 - **No night of overtime on your iPhone.** Its Lock Screen card shows a break's overtime for half an hour, then goes, even with your Mac asleep, and comes back when you press Start. A focus's overtime or a pause stays until the set starts over after 4 hours, as on the Mac, and then your iPhone starts over too. Meowdoro for iPhone is in testing now: to try it, write to [meow@meowdoro.com](mailto:meow@meowdoro.com).

@@ -66,7 +66,7 @@ Focus, short break and long break by the notch, with a cat that keeps the time. 
 - Focus, short break and long break: 25, 5 and 15 minutes, the long break after 4 rounds. All of it is adjustable.
 - A cat sits next to the notch: at its laptop during focus, with a mug on a break. When a phase ends, the island slides out with a bigger cat and what comes next. No Dock icon, no notifications: the island is the notification.
 - The time in the notch as digits, a ring or a bar, counting down or up. It flashes when a minute is left.
-- After a phase ends the time keeps counting up (+3:12) until you start the next one, or the next phase starts on its own. After 4 hours with nothing running (a night away), the timer starts over from the first round.
+- After a phase ends the time keeps counting up (+3:12) until you start the next one, or the next phase starts on its own. After 2 hours with nothing running (lunch or a night away), the timer starts over from the first round.
 - Click "Focus" in the island to name what you're working on.
 - If you want, a focus pauses after 5 minutes without keyboard or mouse, or during a call (camera or microphone in use), with the time rewound to when it began; the island says so, and offers Resume once you're back. Both are off by default.
 - A purr, a beep or nothing when a phase ends, at its own volume.
