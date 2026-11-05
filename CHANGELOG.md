@@ -2,6 +2,10 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Helper 0.7.1 — 2026-11-05
+
+- **Read replies leave your iPhone too.** A finished session whose reply you've read in its app now leaves the summary for your iPhone 15 minutes later, as it leaves your Mac's island. Before, it stayed there for as long as the agent was open.
+
 ## Meowdoro 0.1.26 — 2026-11-04
 
 - **A fresh start after lunch, not only overnight.** After 2 hours with nothing running, instead of 4, the timer starts over from the first round. On your iPhone, a pause or a focus's overtime now leaves the Lock Screen after 2 hours too.

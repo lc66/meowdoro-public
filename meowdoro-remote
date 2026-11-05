@@ -60,7 +60,7 @@ PLUGIN = "meowdoro-remote"
 PLUGIN_ID = f"{PLUGIN}@{PLUGIN}"
 # Helpers before 0.5.0 installed theirs from PLUGINS under the app's name; setup and uninstall take that one away.
 OLD_PLUGIN = "meowdoro"
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 # What the Mac decodes. Changes to the messages only ever add fields; a change old Meowdoros can't read bumps this,
 # and they then say "needs a newer Meowdoro" for this machine instead of guessing.
 PROTOCOL = 1
@@ -105,6 +105,9 @@ SUMMARY_TITLE = 80
 SUMMARY_DETAIL = 120
 # A busy agent that says nothing for this long has probably been closed or interrupted (AgentBoard.quietAfter).
 QUIET_AFTER = 30 * 60
+# A finished or failed session read in its app leaves the summary this long after, as it leaves the Mac's island
+# (AgentBoard.seenExpiry); the agent may stay open for days.
+SEEN_EXPIRY = 15 * 60
 # Order in the summary: stuck first, then waiting, then finished (AgentActivity.urgency).
 URGENCY = {"failed": 0, "waiting": 1, "finished": 2, "working": 3}
 # The relay's envelope version that keeps "z" and "s" (relay of 2026-11 on); older ones pass only {n, c}.
@@ -319,15 +322,20 @@ def board_event(board, name, event, carries_on, now):
     activity, detail = board_state(name, event)
     if not carries_on and (activity, detail) != (board.get("activity"), board.get("detail")):
         board.update(activity=activity, detail=detail, since=when, needs_you=activity in ("waiting", "finished", "failed"))
+        board.pop("read_at", None)
 
 
 def summary_of(sessions, machine, now):
     """This machine's sessions as a phone shows them (MachineSummary.wire): most urgent first, then the latest state
-    first, then by id; at most SUMMARY_LIMIT, the rest counted in "more". No prompts, replies or paths."""
+    first, then by id; at most SUMMARY_LIMIT, the rest counted in "more". No prompts, replies or paths. A finished or
+    failed one read in its app over SEEN_EXPIRY ago is left out, as the Mac drops it."""
     shown = []
     for key, session in sessions.items():
         board = session.get("board")
         if not board or board.get("activity") not in URGENCY:
+            continue
+        read_at = board.get("read_at")
+        if board["activity"] in ("finished", "failed") and read_at is not None and now - read_at > SEEN_EXPIRY:
             continue
         agent, session_id = key.split(":", 1)
         item = {"agent": agent, "session_id": session_id, "project": board.get("project") or "—",
@@ -1438,10 +1446,12 @@ class Daemon:
                 board = self.sessions.get(key, {}).get("board")
                 if board and board.get("activity") == "finished":
                     board.update(activity="waiting", detail=question[:SUMMARY_DETAIL], needs_you=True)
+                    board.pop("read_at", None)
             for key in read:
                 board = self.sessions.get(key, {}).get("board")
                 if board:
                     board["needs_you"] = False
+                    board["read_at"] = now
         for key, question in questions.items():
             agent, session_id = key.split(":", 1)
             self.send({"type": "question", "agent": agent, "session_id": session_id, "machine": self.machine, "question": question, "t": now})
