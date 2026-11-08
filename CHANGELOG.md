@@ -2,6 +2,10 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.27 — 2026-11-08
+
+- **Here before December? It stays free for you.** Meowdoro becomes a one-time purchase in December 2026. Run this version on your Mac before then and Meowdoro stays free for you for good. It registers this Mac once: a random install id and a one-way hash of the Mac's hardware id, nothing about you or your work ([privacy](https://meowdoro.com/privacy.html)). On a new Mac it comes along, up to 3 Macs.
+
 ## Helper 0.7.1 — 2026-11-05
 
 - **Read replies leave your iPhone too.** A finished session whose reply you've read in its app now leaves the summary for your iPhone 15 minutes later, as it leaves your Mac's island. Before, it stayed there for as long as the agent was open.
