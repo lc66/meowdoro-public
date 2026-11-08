@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.26</title>
-      <pubDate>Wed, 04 Nov 2026 12:28:31 GMT</pubDate>
-      <sparkle:version>27</sparkle:version>
-      <sparkle:shortVersionString>0.1.26</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.27</title>
+      <pubDate>Sun, 08 Nov 2026 14:35:57 GMT</pubDate>
+      <sparkle:version>28</sparkle:version>
+      <sparkle:shortVersionString>0.1.27</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>A fresh start after lunch, not only overnight.</b> After 2 hours with nothing running, instead of 4, the timer starts over from the first round. On your iPhone, a pause or a focus's overtime now leaves the Lock Screen after 2 hours too.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.26/Meowdoro-0.1.26.dmg" type="application/octet-stream" sparkle:edSignature="mLY+S4+biIwno/mVEa3xO4Tk+P9ffmDM+JJnhTrSogMpqjxmR7OSc0ODY7kEzuBYYaO7uWfyfmKzLvS8Uz/WCw==" length="10847761"/>
+      <description><![CDATA[<ul><li><b>Here before December? It stays free for you.</b> Meowdoro becomes a one-time purchase in December 2026. Run this version on your Mac before then and Meowdoro stays free for you for good. It registers this Mac once: a random install id and a one-way hash of the Mac's hardware id, nothing about you or your work ([privacy](https://meowdoro.com/privacy.html)). On a new Mac it comes along, up to 3 Macs.</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.27/Meowdoro-0.1.27.dmg" type="application/octet-stream" sparkle:edSignature="3t7WTskWOOoxlTMYS47dNurBSvuOKiWMeRt1uCPmIzvIcZhQxyNZBkqvmqwT9ATWmEY36sjJkdzYWBMCIJCZAw==" length="10951106"/>
     </item>
   </channel>
 </rss>
