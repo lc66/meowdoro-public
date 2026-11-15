@@ -2,6 +2,11 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.28 — 2026-11-15
+
+- **Fixed: your iPhone kept quiet after a break taken away from the Mac.** Start a break and walk off with your phone without locking the Mac, and at the break's end the Mac purred to an empty room: it waited for 5 minutes without the keyboard or mouse before it counted you away, and the click that started the break reset that. Now a phase in which nobody touched the Mac counts as away at its end, so your iPhone purrs (Meowdoro for iPhone is in testing).
+- **Settings → Remote agents suggests updating a helper older than 0.7.1** on your other machines.
+
 ## Meowdoro 0.1.27 — 2026-11-08
 
 - **Here before December? It stays free for you.** Meowdoro becomes a one-time purchase in December 2026. Run this version on your Mac before then and Meowdoro stays free for you for good. It registers this Mac once: a random install id and a one-way hash of the Mac's hardware id, nothing about you or your work ([privacy](https://meowdoro.com/privacy.html)). On a new Mac it comes along, up to 3 Macs.
