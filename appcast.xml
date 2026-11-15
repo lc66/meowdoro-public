@@ -4,13 +4,13 @@
     <title>Meowdoro</title>
     <link>https://github.com/lc66/meowdoro-public</link>
     <item>
-      <title>Meowdoro 0.1.28</title>
-      <pubDate>Sun, 15 Nov 2026 10:16:40 GMT</pubDate>
-      <sparkle:version>29</sparkle:version>
-      <sparkle:shortVersionString>0.1.28</sparkle:shortVersionString>
+      <title>Meowdoro 0.1.29</title>
+      <pubDate>Sun, 15 Nov 2026 11:29:32 GMT</pubDate>
+      <sparkle:version>30</sparkle:version>
+      <sparkle:shortVersionString>0.1.29</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li><b>Fixed: your iPhone kept quiet after a break taken away from the Mac.</b> Start a break and walk off with your phone without locking the Mac, and at the break's end the Mac purred to an empty room: it waited for 5 minutes without the keyboard or mouse before it counted you away, and the click that started the break reset that. Now a phase in which nobody touched the Mac counts as away at its end, so your iPhone purrs (Meowdoro for iPhone is in testing).</li><li><b>Settings → Remote agents suggests updating a helper older than 0.7.1</b> on your other machines.</li></ul>]]></description>
-      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.28/Meowdoro-0.1.28.dmg" type="application/octet-stream" sparkle:edSignature="S/KyzaOLFviDbBGRIgR+IHYK2qx8dqPUN6ZuSTxrWwnJMmRQ43dFdM/FvDylTao1fwa+jiRPItPJk79ZbCtlCQ==" length="10957469"/>
+      <description><![CDATA[<ul><li><b>Choose when you count as away from the Mac.</b> Settings → iPhone → Away from this Mac after: 1, 2, 3, 5 or 10 minutes without the keyboard or mouse (5 by default). After that, your iPhone purrs at the end of a session instead of the Mac. A locked or sleeping Mac still counts at once (Meowdoro for iPhone is in testing).</li></ul>]]></description>
+      <enclosure url="https://github.com/lc66/meowdoro-public/releases/download/app-v0.1.29/Meowdoro-0.1.29.dmg" type="application/octet-stream" sparkle:edSignature="vr3nPwoSNd1+qYquzVGpwZj4ztM9bHpJYDx2FCNsDiXRVExLaaGLQUKrEHCLc+CMBPdb9QsgbhyooshLkjUMDA==" length="10965750"/>
     </item>
   </channel>
 </rss>
