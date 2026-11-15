@@ -2,6 +2,10 @@
 
 Meowdoro (the app, tags `app-v…`) and the helper for remote machines (tags `helper-v…`) have their own versions. Both are here, newest first.
 
+## Meowdoro 0.1.29 — 2026-11-15
+
+- **Choose when you count as away from the Mac.** Settings → iPhone → Away from this Mac after: 1, 2, 3, 5 or 10 minutes without the keyboard or mouse (5 by default). After that, your iPhone purrs at the end of a session instead of the Mac. A locked or sleeping Mac still counts at once (Meowdoro for iPhone is in testing).
+
 ## Meowdoro 0.1.28 — 2026-11-15
 
 - **Fixed: your iPhone kept quiet after a break taken away from the Mac.** Start a break and walk off with your phone without locking the Mac, and at the break's end the Mac purred to an empty room: it waited for 5 minutes without the keyboard or mouse before it counted you away, and the click that started the break reset that. Now a phase in which nobody touched the Mac counts as away at its end, so your iPhone purrs (Meowdoro for iPhone is in testing).
