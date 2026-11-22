@@ -24,6 +24,8 @@ mkdir -p ~/.claude/skills/night && curl -fsSL https://raw.githubusercontent.com/
 
 Then, before bed, type `/night`.
 
+If it saved you a night, [star the repo](https://github.com/lc66/meowdoro-public) ⭐
+
 ---
 
 Made by the author of [Meowdoro](https://meowdoro.com/?utm_source=github&utm_medium=skill&utm_campaign=night), a timer
